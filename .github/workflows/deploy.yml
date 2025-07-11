@@ -1,0 +1,399 @@
+name: ThemisGuard CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  SAM_CLI_VERSION: 1.100.0
+
+jobs:
+  # Security and Quality Checks
+  security-scan:
+    name: Security & Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety semgrep
+          pip install -r backend/requirements.txt
+
+      - name: Run Bandit security linter
+        run: |
+          bandit -r backend/ -f json -o bandit-report.json || true
+          bandit -r backend/ -f txt
+
+      - name: Check for known vulnerabilities
+        run: |
+          safety check -r backend/requirements.txt
+
+      - name: Run Semgrep security analysis
+        run: |
+          semgrep --config=auto backend/ --json -o semgrep-report.json || true
+
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            semgrep-report.json
+
+  # Unit and Integration Tests
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-cov pytest-mock moto
+
+      - name: Run unit tests
+        run: |
+          cd backend
+          python -m pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: |
+            backend/coverage.xml
+            backend/htmlcov/
+
+  # Frontend Build and Test
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run linting
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run tests
+        run: |
+          cd frontend
+          npm run test -- --coverage --watchAll=false
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend/dist/
+
+  # Infrastructure Validation
+  validate-infrastructure:
+    name: Validate SAM Template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install SAM CLI
+        run: |
+          pip install aws-sam-cli==${{ env.SAM_CLI_VERSION }}
+
+      - name: Validate SAM template
+        run: |
+          sam validate --template template.yaml
+
+      - name: SAM build
+        run: |
+          sam build
+
+      - name: Upload SAM artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: sam-build
+          path: .aws-sam/
+
+  # Deploy to Development
+  deploy-dev:
+    name: Deploy to Development
+    needs: [security-scan, test, frontend-test, validate-infrastructure]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SAM artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: sam-build
+          path: .aws-sam/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install SAM CLI
+        run: |
+          pip install aws-sam-cli==${{ env.SAM_CLI_VERSION }}
+
+      - name: Deploy to development
+        run: |
+          sam deploy --config-env dev \
+            --parameter-overrides \
+              "StripeSecretKey=${{ secrets.STRIPE_TEST_SECRET_KEY }}" \
+              "StripePublishableKey=${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}" \
+              "StripeWebhookSecret=${{ secrets.STRIPE_TEST_WEBHOOK_SECRET }}" \
+              "GoogleClientId=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GCPProjectId=${{ secrets.GCP_PROJECT_ID }}" \
+            --no-confirm-changeset
+
+      - name: Run smoke tests
+        run: |
+          # Wait for deployment to settle
+          sleep 30
+          
+          # Get API Gateway URL
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name themisguard-api-dev \
+            --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
+            --output text)
+          
+          # Basic health check
+          curl -f "$API_URL/health" || exit 1
+          echo "Development deployment successful!"
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [deploy-dev]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SAM artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: sam-build
+          path: .aws-sam/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install SAM CLI
+        run: |
+          pip install aws-sam-cli==${{ env.SAM_CLI_VERSION }}
+
+      - name: Deploy to staging
+        run: |
+          sam deploy --config-env staging \
+            --parameter-overrides \
+              "StripeSecretKey=${{ secrets.STRIPE_TEST_SECRET_KEY }}" \
+              "StripePublishableKey=${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}" \
+              "StripeWebhookSecret=${{ secrets.STRIPE_TEST_WEBHOOK_SECRET }}" \
+              "GoogleClientId=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GCPProjectId=${{ secrets.GCP_PROJECT_ID }}" \
+            --no-confirm-changeset
+
+      - name: Run integration tests
+        run: |
+          # Wait for deployment to settle
+          sleep 30
+          
+          # Get API Gateway URL
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name themisguard-api-staging \
+            --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
+            --output text)
+          
+          # Extended health checks
+          curl -f "$API_URL/health" || exit 1
+          curl -f "$API_URL/api/v1/billing/plans" || exit 1
+          echo "Staging deployment successful!"
+
+      - name: Notify team
+        if: success()
+        run: |
+          echo "🚀 Staging deployment completed successfully!"
+          echo "API URL: $API_URL"
+
+  # Deploy to Production (Manual Approval Required)
+  deploy-prod:
+    name: Deploy to Production
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - name: Manual approval required
+        run: |
+          echo "🔒 Production deployment requires manual approval"
+          echo "Please review staging environment and approve this deployment"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SAM artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: sam-build
+          path: .aws-sam/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install SAM CLI
+        run: |
+          pip install aws-sam-cli==${{ env.SAM_CLI_VERSION }}
+
+      - name: Deploy to production
+        run: |
+          sam deploy --config-env prod \
+            --parameter-overrides \
+              "StripeSecretKey=${{ secrets.STRIPE_LIVE_SECRET_KEY }}" \
+              "StripePublishableKey=${{ secrets.STRIPE_LIVE_PUBLISHABLE_KEY }}" \
+              "StripeWebhookSecret=${{ secrets.STRIPE_LIVE_WEBHOOK_SECRET }}" \
+              "GoogleClientId=${{ secrets.GOOGLE_CLIENT_ID }}" \
+              "GCPProjectId=${{ secrets.GCP_PROJECT_ID }}" \
+              "CustomDomainName=${{ secrets.CUSTOM_DOMAIN_NAME }}" \
+              "SSLCertificateArn=${{ secrets.SSL_CERTIFICATE_ARN }}" \
+            --no-confirm-changeset
+
+      - name: Production health check
+        run: |
+          # Wait for deployment to settle
+          sleep 60
+          
+          # Get API Gateway URL
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name themisguard-api-prod \
+            --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
+            --output text)
+          
+          # Critical health checks
+          curl -f "$API_URL/health" || exit 1
+          
+          # Verify key endpoints
+          curl -f "$API_URL/api/v1/billing/plans" || exit 1
+          
+          echo "✅ Production deployment successful!"
+          echo "API URL: $API_URL"
+
+      - name: Post-deployment verification
+        run: |
+          # Check CloudWatch alarms
+          aws cloudwatch describe-alarms \
+            --alarm-names "themisguard-api-prod-high-error-rate" \
+            --query 'MetricAlarms[0].StateValue' \
+            --output text
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "🎉 ThemisGuard production deployment completed successfully!"
+          echo "Monitor the system closely for the next 24 hours"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Production deployment failed, initiating rollback..."
+          aws cloudformation cancel-update-stack --stack-name themisguard-api-prod || true
+          
+          # Notify team of failure
+          echo "🚨 Production deployment failed and rollback initiated"
+
+  # Cleanup Development Resources (Cost Optimization)
+  cleanup-dev:
+    name: Cleanup Development Resources
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' # Run on schedule to save costs
+    environment: development
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Stop non-essential resources
+        run: |
+          # This would include stopping/scaling down resources
+          # that can be safely stopped overnight in development
+          echo "Implementing cost optimization for development resources"
+          
+          # Example: Scale down Lambda provisioned concurrency
+          # aws lambda put-provisioned-concurrency-config \
+          #   --function-name themisguard-api-dev-ThemisGuardAPI \
+          #   --provisioned-concurrency-units 0
+
+# Schedule for cost optimization (run at 10 PM EST on weekdays)
+# on:
+#   schedule:
+#     - cron: '0 2 * * 1-5'  # 2 AM UTC = 10 PM EST

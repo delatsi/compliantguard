@@ -1,0 +1,27 @@
+{
+  "result": [
+    {
+      "expressions": [
+        {
+          "value": [
+            "HIPAA Review Required - Project 'medtelligence' IAM policies should be reviewed for minimum necessary access (Minimum Necessary Standard)",
+            "HIPAA Violation - Compute instance 'livekit-agent' lacks session timeout configuration (Technical Safeguards - Automatic Logoff)",
+            "HIPAA Violation - Default service account '668668923572-compute@developer.gserviceaccount.com' should not be used for PHI access (Admin Safeguards)",
+            "HIPAA Violation - Firewall rule 'default-allow-rdp' allows unrestricted access to sensitive port 3389 (Network Security)",
+            "HIPAA Violation - Firewall rule 'default-allow-ssh' allows unrestricted access to sensitive port 22 (Network Security)",
+            "HIPAA Violation - Log sink '_Default' not configured for long-term storage required for breach detection (Breach Notification Rule)",
+            "HIPAA Violation - Log sink '_Required' not configured for long-term storage required for breach detection (Breach Notification Rule)",
+            "HIPAA Violation - Storage bucket 'cloud-ai-platform-12149af2-aa5c-4c9d-bfd5-9fd5abec40b5' allows public access, violating access controls (Technical Safeguards)",
+            "HIPAA Violation - Storage bucket 'medtelligence_cloudbuild' allows public access, violating access controls (Technical Safeguards)",
+            "HIPAA Violation - Storage bucket 'run-sources-medtelligence-us-central1' allows public access, violating access controls (Technical Safeguards)"
+          ],
+          "text": "data.hipaa.compliance.violations",
+          "location": {
+            "row": 1,
+            "col": 1
+          }
+        }
+      ]
+    }
+  ]
+}

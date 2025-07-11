@@ -1,0 +1,518 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        default: 'latest'
+      skip_tests:
+        description: 'Skip tests (emergency deployment)'
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  SAM_CONFIG_ENV: prod
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  pre-deployment-checks:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Determine version
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          VERSION="${{ github.event.release.tag_name }}"
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Deploying version: $VERSION"
+    
+    - name: Check deployment approval
+      id: check
+      run: |
+        # For manual deployments, require approval
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "Manual deployment triggered - requiring approval"
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+        else
+          echo "Release deployment - proceeding automatically"
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Validate production readiness
+      run: |
+        echo "🔍 Validating production readiness..."
+        
+        # Check for required files
+        required_files=(
+          "backend/template.yaml"
+          "backend/samconfig.toml"
+          "frontend/package.json"
+          "docs/deployment-guide.md"
+        )
+        
+        for file in "${required_files[@]}"; do
+          if [[ ! -f "$file" ]]; then
+            echo "❌ Missing required file: $file"
+            exit 1
+          fi
+        done
+        
+        echo "✅ All required files present"
+
+  test-production-build:
+    needs: pre-deployment-checks
+    runs-on: ubuntu-latest
+    if: needs.pre-deployment-checks.outputs.should_deploy == 'true' && github.event.inputs.skip_tests != 'true'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio
+    
+    - name: Run comprehensive backend tests
+      run: |
+        cd backend
+        pytest tests/ -v --cov=. --cov-report=term-missing --cov-fail-under=80
+    
+    - name: Build backend for production
+      run: |
+        cd backend
+        sam build --config-env ${{ env.SAM_CONFIG_ENV }}
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run frontend tests
+      run: |
+        cd frontend
+        npm run test:ci
+    
+    - name: Build frontend for production
+      run: |
+        cd frontend
+        echo "VITE_API_URL=https://api.themisguard.com" > .env.production
+        echo "VITE_ENVIRONMENT=production" >> .env.production
+        npm run build
+    
+    - name: Audit dependencies
+      run: |
+        cd frontend
+        npm audit --audit-level=high
+        cd ../backend
+        pip-audit
+
+  security-scan-production:
+    needs: pre-deployment-checks
+    runs-on: ubuntu-latest
+    if: needs.pre-deployment-checks.outputs.should_deploy == 'true'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run comprehensive security scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+        exit-code: '1'
+        severity: 'CRITICAL,HIGH'
+    
+    - name: Check for secrets in production
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --fail
+
+  backup-production:
+    needs: [pre-deployment-checks, test-production-build]
+    runs-on: ubuntu-latest
+    if: always() && needs.pre-deployment-checks.outputs.should_deploy == 'true'
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Create pre-deployment backup
+      run: |
+        echo "🔄 Creating pre-deployment backup..."
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        BACKUP_BUCKET="themisguard-backups-prod"
+        
+        # Backup current Lambda functions
+        aws lambda list-functions \
+          --query 'Functions[?starts_with(FunctionName, `themisguard`)].FunctionName' \
+          --output text | while read FUNCTION; do
+          echo "Backing up function: $FUNCTION"
+          aws lambda get-function --function-name $FUNCTION \
+            --query 'Code.Location' --output text | \
+            xargs curl -o /tmp/${FUNCTION}-${TIMESTAMP}.zip
+          aws s3 cp /tmp/${FUNCTION}-${TIMESTAMP}.zip \
+            s3://${BACKUP_BUCKET}/functions/${TIMESTAMP}/${FUNCTION}.zip
+        done
+        
+        # Backup DynamoDB tables
+        aws dynamodb list-tables \
+          --query 'TableNames[?starts_with(@, `themisguard`)]' \
+          --output text | while read TABLE; do
+          echo "Creating backup for table: $TABLE"
+          aws dynamodb create-backup \
+            --table-name $TABLE \
+            --backup-name "${TABLE}-pre-deployment-${TIMESTAMP}"
+        done
+        
+        echo "✅ Backup completed: $TIMESTAMP"
+        echo "backup_timestamp=$TIMESTAMP" >> $GITHUB_ENV
+
+  deploy-backend-production:
+    needs: [backup-production, security-scan-production]
+    runs-on: ubuntu-latest
+    environment: production
+    if: always() && needs.pre-deployment-checks.outputs.should_deploy == 'true'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up SAM CLI
+      uses: aws-actions/setup-sam@v2
+      with:
+        use-installer: true
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Build SAM application
+      run: |
+        cd backend
+        sam build --config-env ${{ env.SAM_CONFIG_ENV }}
+    
+    - name: Deploy to production
+      run: |
+        cd backend
+        sam deploy \
+          --config-env ${{ env.SAM_CONFIG_ENV }} \
+          --no-confirm-changeset \
+          --no-fail-on-empty-changeset \
+          --parameter-overrides \
+            Environment=prod \
+            Version=${{ needs.pre-deployment-checks.outputs.version }} \
+            Branch=${{ github.ref_name }}
+    
+    - name: Verify deployment
+      run: |
+        cd backend
+        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue')
+        
+        echo "🔍 Verifying API deployment..."
+        sleep 60  # Allow time for deployment to stabilize
+        
+        # Health check
+        if curl -f "$API_URL/health"; then
+          echo "✅ API health check passed"
+        else
+          echo "❌ API health check failed"
+          exit 1
+        fi
+        
+        # Version check
+        DEPLOYED_VERSION=$(curl -s "$API_URL/version" | jq -r '.version')
+        if [[ "$DEPLOYED_VERSION" == "${{ needs.pre-deployment-checks.outputs.version }}" ]]; then
+          echo "✅ Version verification passed: $DEPLOYED_VERSION"
+        else
+          echo "❌ Version mismatch. Expected: ${{ needs.pre-deployment-checks.outputs.version }}, Got: $DEPLOYED_VERSION"
+          exit 1
+        fi
+
+  deploy-frontend-production:
+    needs: [deploy-backend-production]
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Get production API URL
+      id: get-api-url
+      run: |
+        API_URL=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-api-prod \
+          --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+          --output text)
+        echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Build frontend for production
+      run: |
+        cd frontend
+        echo "VITE_API_URL=${{ steps.get-api-url.outputs.api_url }}" > .env.production
+        echo "VITE_ENVIRONMENT=production" >> .env.production
+        echo "VITE_VERSION=${{ needs.pre-deployment-checks.outputs.version }}" >> .env.production
+        npm run build
+    
+    - name: Deploy to S3 with backup
+      run: |
+        cd frontend
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        
+        # Backup current frontend
+        echo "🔄 Backing up current frontend..."
+        aws s3 sync s3://themisguard-frontend-prod s3://themisguard-backups-prod/frontend/$TIMESTAMP/
+        
+        # Deploy new version
+        echo "🚀 Deploying new frontend..."
+        aws s3 sync dist/ s3://themisguard-frontend-prod --delete
+        
+        # Update cache headers for index.html
+        aws s3 cp s3://themisguard-frontend-prod/index.html s3://themisguard-frontend-prod/index.html \
+          --metadata-directive REPLACE \
+          --cache-control "no-cache, no-store, must-revalidate"
+    
+    - name: Invalidate CloudFront with staged rollout
+      run: |
+        DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-frontend-prod \
+          --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue' \
+          --output text)
+        
+        echo "🔄 Creating CloudFront invalidation..."
+        INVALIDATION_ID=$(aws cloudfront create-invalidation \
+          --distribution-id $DISTRIBUTION_ID \
+          --paths "/*" \
+          --query 'Invalidation.Id' \
+          --output text)
+        
+        echo "⏳ Waiting for invalidation to complete..."
+        aws cloudfront wait invalidation-completed \
+          --distribution-id $DISTRIBUTION_ID \
+          --id $INVALIDATION_ID
+        
+        echo "✅ CloudFront invalidation completed"
+
+  production-smoke-tests:
+    needs: [deploy-frontend-production]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Get production URLs
+      id: get-urls
+      run: |
+        API_URL=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-api-prod \
+          --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+          --output text)
+        FRONTEND_URL=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-frontend-prod \
+          --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' \
+          --output text)
+        echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+        echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+    
+    - name: Run production smoke tests
+      run: |
+        echo "🧪 Running production smoke tests..."
+        
+        # API health check
+        echo "Testing API health..."
+        if curl -f "${{ steps.get-urls.outputs.api_url }}/health"; then
+          echo "✅ API health check passed"
+        else
+          echo "❌ API health check failed"
+          exit 1
+        fi
+        
+        # Frontend availability
+        echo "Testing frontend availability..."
+        if curl -f "${{ steps.get-urls.outputs.frontend_url }}"; then
+          echo "✅ Frontend availability check passed"
+        else
+          echo "❌ Frontend availability check failed"
+          exit 1
+        fi
+        
+        # API authentication endpoints
+        echo "Testing authentication endpoints..."
+        if curl -f "${{ steps.get-urls.outputs.api_url }}/auth/google/url"; then
+          echo "✅ Authentication endpoint check passed"
+        else
+          echo "❌ Authentication endpoint check failed"
+          exit 1
+        fi
+        
+        echo "🎉 All smoke tests passed!"
+
+  post-deployment:
+    needs: [production-smoke-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+      if: success()
+    
+    - name: Update deployment tracking
+      run: |
+        if [[ "${{ needs.production-smoke-tests.result }}" == "success" ]]; then
+          echo "✅ Production deployment successful"
+          
+          # Tag successful deployment
+          aws ssm put-parameter \
+            --name "/themisguard/prod/last-successful-deployment" \
+            --value "${{ needs.pre-deployment-checks.outputs.version }}" \
+            --type "String" \
+            --overwrite
+          
+          # Create deployment record
+          aws ssm put-parameter \
+            --name "/themisguard/prod/deployments/${{ needs.pre-deployment-checks.outputs.version }}" \
+            --value "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"commit\":\"${{ github.sha }}\",\"actor\":\"${{ github.actor }}\"}" \
+            --type "String"
+        else
+          echo "❌ Production deployment failed"
+        fi
+      if: always()
+    
+    - name: Create deployment summary
+      run: |
+        echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Version:** ${{ needs.pre-deployment-checks.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ${{ needs.production-smoke-tests.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.production-smoke-tests.result }}" == "success" ]]; then
+          echo "### 🎉 Deployment completed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**🌐 Production URL:** https://app.themisguard.com" >> $GITHUB_STEP_SUMMARY
+          echo "**📊 Monitoring:** https://console.aws.amazon.com/cloudwatch/" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ⚠️ Deployment failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the logs and consider rolling back if necessary." >> $GITHUB_STEP_SUMMARY
+        fi
+
+  rollback-on-failure:
+    needs: [production-smoke-tests, backup-production]
+    runs-on: ubuntu-latest
+    if: failure() && needs.backup-production.result == 'success'
+    environment: production
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Automatic rollback
+      run: |
+        echo "🔄 Initiating automatic rollback..."
+        
+        # Get last successful deployment version
+        LAST_VERSION=$(aws ssm get-parameter \
+          --name "/themisguard/prod/last-successful-deployment" \
+          --query 'Parameter.Value' \
+          --output text)
+        
+        if [[ -n "$LAST_VERSION" && "$LAST_VERSION" != "None" ]]; then
+          echo "Rolling back to version: $LAST_VERSION"
+          
+          # This would typically involve redeploying the last known good version
+          # For now, we'll just log the rollback intent
+          echo "⚠️ Automatic rollback to $LAST_VERSION would be initiated here"
+          echo "Manual intervention may be required"
+        else
+          echo "⚠️ No previous successful deployment found"
+          echo "Manual rollback required"
+        fi

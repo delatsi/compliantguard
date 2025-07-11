@@ -1,0 +1,25 @@
+{
+  "name": "themisguard",
+  "version": "1.0.0",
+  "description": "HIPAA Compliance Scanner for GCP",
+  "scripts": {
+    "dev": "./scripts/start-dev.sh",
+    "start": "./scripts/start-dev.sh",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview",
+    "backend": "cd backend && source venv/bin/activate && python dev.py",
+    "frontend": "cd frontend && npm run dev",
+    "install-all": "cd backend && pip install -r requirements.txt && cd ../frontend && npm install",
+    "deploy": "sam build && sam deploy"
+  },
+  "keywords": [
+    "hipaa",
+    "compliance",
+    "gcp",
+    "security",
+    "fastapi",
+    "react"
+  ],
+  "author": "ThemisGuard Team",
+  "license": "MIT"
+}

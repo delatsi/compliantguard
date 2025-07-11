@@ -1,0 +1,47 @@
+"""
+ThemisGuard GCP Asset Crawler
+
+This script exports all GCP resources using Cloud Asset Inventory
+and writes them to a JSON file. No PHI is accessed or stored.
+"""
+
+import os
+import json
+from google.cloud import asset_v1
+from google.oauth2 import service_account
+
+# Load credentials and project ID from environment
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+CREDS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
+if not PROJECT_ID or not CREDS_PATH:
+    raise EnvironmentError("Set GCP_PROJECT_ID and GOOGLE_APPLICATION_CREDENTIALS environment variables.")
+
+# Initialize client
+credentials = service_account.Credentials.from_service_account_file(CREDS_PATH)
+client = asset_v1.AssetServiceClient(credentials=credentials)
+scope = f"projects/{PROJECT_ID}"
+
+# Fetch asset metadata
+print(f"Scanning GCP project: {PROJECT_ID}")
+assets = []
+
+response = client.list_assets(
+    request={
+        "parent": scope,
+        "content_type": asset_v1.ContentType.RESOURCE,
+        "read_time": None,
+        "asset_types": [],  # All types
+        "page_size": 1000,
+    }
+)
+
+for asset in response:
+    assets.append(asset.resource)
+
+# Save results
+output_file = "gcp_assets.json"
+with open(output_file, "w") as f:
+    json.dump([dict(a) for a in assets], f, indent=2)
+
+print(f"✅ Exported {len(assets)} assets to {output_file}")

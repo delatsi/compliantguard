@@ -1,0 +1,355 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop ]
+
+env:
+  AWS_REGION: us-east-1
+  SAM_CONFIG_ENV: dev
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio
+    
+    - name: Run linting
+      run: |
+        cd backend
+        pip install flake8 black isort
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        black --check .
+        isort --check-only .
+    
+    - name: Run tests
+      run: |
+        cd backend
+        pytest tests/ -v --cov=. --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run linting
+      run: |
+        cd frontend
+        npm run lint
+    
+    - name: Run tests
+      run: |
+        cd frontend
+        npm run test:ci
+    
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-build
+        path: frontend/dist
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Check for secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+
+  deploy-backend:
+    needs: [test-backend, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up SAM CLI
+      uses: aws-actions/setup-sam@v2
+      with:
+        use-installer: true
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Cache SAM dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          backend/.aws-sam
+        key: ${{ runner.os }}-sam-${{ hashFiles('**/template.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-sam-
+    
+    - name: Build SAM application
+      run: |
+        cd backend
+        sam build --config-env ${{ env.SAM_CONFIG_ENV }}
+    
+    - name: Deploy to AWS
+      run: |
+        cd backend
+        sam deploy \
+          --config-env ${{ env.SAM_CONFIG_ENV }} \
+          --no-confirm-changeset \
+          --no-fail-on-empty-changeset \
+          --parameter-overrides \
+            Environment=dev \
+            Version=${{ github.sha }} \
+            Branch=${{ github.ref_name }}
+    
+    - name: Get API Gateway URL
+      id: get-url
+      run: |
+        cd backend
+        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue')
+        echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+    
+    - name: Run API health check
+      run: |
+        sleep 30
+        curl -f ${{ steps.get-url.outputs.api_url }}/health || exit 1
+
+  deploy-frontend:
+    needs: [test-frontend, deploy-backend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Get backend API URL
+      id: get-api-url
+      run: |
+        cd backend
+        API_URL=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-api-dev \
+          --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+          --output text)
+        echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Build frontend with API URL
+      run: |
+        cd frontend
+        echo "VITE_API_URL=${{ steps.get-api-url.outputs.api_url }}" > .env.production
+        echo "VITE_ENVIRONMENT=development" >> .env.production
+        npm run build
+    
+    - name: Deploy to S3
+      run: |
+        cd frontend
+        aws s3 sync dist/ s3://themisguard-frontend-dev --delete
+        aws s3 cp s3://themisguard-frontend-dev/index.html s3://themisguard-frontend-dev/index.html \
+          --metadata-directive REPLACE \
+          --cache-control "no-cache, no-store, must-revalidate"
+    
+    - name: Invalidate CloudFront
+      run: |
+        DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-frontend-dev \
+          --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue' \
+          --output text)
+        aws cloudfront create-invalidation \
+          --distribution-id $DISTRIBUTION_ID \
+          --paths "/*"
+
+  integration-tests:
+    needs: [deploy-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Get frontend URL
+      id: get-frontend-url
+      run: |
+        FRONTEND_URL=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-frontend-dev \
+          --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' \
+          --output text)
+        echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+    
+    - name: Install Playwright
+      run: |
+        cd frontend
+        npm ci
+        npx playwright install --with-deps
+    
+    - name: Run E2E tests
+      run: |
+        cd frontend
+        BASE_URL=${{ steps.get-frontend-url.outputs.frontend_url }} npx playwright test
+      env:
+        CI: true
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: playwright-report
+        path: frontend/playwright-report/
+
+  notify-deployment:
+    needs: [integration-tests]
+    runs-on: ubuntu-latest
+    if: always() && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    
+    steps:
+    - name: Get deployment status
+      id: deployment-status
+      run: |
+        if [[ "${{ needs.integration-tests.result }}" == "success" ]]; then
+          echo "status=✅ Success" >> $GITHUB_OUTPUT
+          echo "color=good" >> $GITHUB_OUTPUT
+        else
+          echo "status=❌ Failed" >> $GITHUB_OUTPUT
+          echo "color=danger" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-region: ${{ env.AWS_REGION }}
+      if: needs.integration-tests.result == 'success'
+    
+    - name: Get deployment URLs
+      id: get-urls
+      run: |
+        API_URL=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-api-dev \
+          --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+          --output text)
+        FRONTEND_URL=$(aws cloudformation describe-stacks \
+          --stack-name themisguard-frontend-dev \
+          --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' \
+          --output text)
+        echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+        echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+      if: needs.integration-tests.result == 'success'
+    
+    - name: Create deployment summary
+      run: |
+        echo "## 🚀 Development Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ${{ steps.deployment-status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [[ "${{ needs.integration-tests.result }}" == "success" ]]; then
+          echo "**🌐 Frontend URL:** ${{ steps.get-urls.outputs.frontend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**🔗 API URL:** ${{ steps.get-urls.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Deployment failed - check logs for details" >> $GITHUB_STEP_SUMMARY
+        fi
