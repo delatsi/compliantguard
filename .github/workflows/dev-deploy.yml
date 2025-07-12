@@ -14,7 +14,7 @@ permissions:
 env:
   AWS_REGION: us-east-1
   SAM_CONFIG_ENV: dev
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   PYTHON_VERSION: '3.11'
 
 jobs:
