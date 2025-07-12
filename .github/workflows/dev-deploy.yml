@@ -177,8 +177,8 @@ jobs:
         STACK_NAME="themisguard-api-${{ env.SAM_CONFIG_ENV }}"
         STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
         
-        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
-          echo "🧹 Stack is in ROLLBACK_COMPLETE state, deleting before redeploy..."
+        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" || "$STACK_STATUS" == "ROLLBACK_FAILED" ]]; then
+          echo "🧹 Stack is in $STACK_STATUS state, deleting before redeploy..."
           aws cloudformation delete-stack --stack-name "$STACK_NAME"
           aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
           echo "✅ Stack deleted successfully"
