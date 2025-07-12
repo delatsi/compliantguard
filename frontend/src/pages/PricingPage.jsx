@@ -10,23 +10,74 @@ import {
 const PricingPage = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [availablePlans, setAvailablePlans] = useState({});
   const [billingInterval, setBillingInterval] = useState('monthly');
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadPlans();
-  }, []);
-
-  const loadPlans = async () => {
-    try {
-      const response = await fetch('/api/v1/billing/plans');
-      const data = await response.json();
-      setAvailablePlans(data.plans);
-    } catch (error) {
-      console.error('Failed to load plans:', error);
-    } finally {
-      setLoading(false);
+  // Updated pricing plans
+  const availablePlans = {
+    free: {
+      name: 'Free',
+      price_monthly: 0,
+      price_annual: 0,
+      description: 'Perfect for getting started with basic compliance scanning',
+      features: [
+        'Up to 5 scans per month',
+        'Basic HIPAA compliance checks',
+        'Email support',
+        'Standard reports',
+        'Public cloud scanning (GCP, AWS)',
+        'Basic dashboard'
+      ],
+      limitations: [
+        'No ML-powered insights',
+        'No custom policies',
+        'No priority support'
+      ],
+      cta: 'Get Started Free',
+      popular: false
+    },
+    starter: {
+      name: 'Starter',
+      price_monthly: 49,
+      price_annual: 490, // ~17% savings (49*12 = 588, so 490 is about 17% off)
+      description: 'Ideal for small teams and growing organizations',
+      features: [
+        'Up to 50 scans per month',
+        'Full HIPAA & SOC 2 compliance',
+        'Priority email support',
+        'Advanced reporting & analytics',
+        'Multi-cloud scanning',
+        'Custom compliance policies',
+        'API access',
+        'Team collaboration (up to 5 users)'
+      ],
+      limitations: [
+        'No ML-powered risk assessment',
+        'No automated remediation suggestions'
+      ],
+      cta: 'Start Free Trial',
+      popular: true
+    },
+    pro: {
+      name: 'Pro',
+      price_monthly: 99,
+      price_annual: 990, // ~17% savings
+      description: 'Advanced features for enterprise security teams',
+      features: [
+        'Unlimited scans',
+        'All compliance frameworks (HIPAA, SOC 2, PCI DSS, GDPR)',
+        'Phone & chat support',
+        'ML-powered risk assessment',
+        'Automated remediation suggestions',
+        'Custom integrations',
+        'Advanced API with webhooks',
+        'Unlimited team members',
+        'White-label reporting',
+        'Dedicated account manager',
+        'SSO integration'
+      ],
+      limitations: [],
+      cta: 'Start Free Trial',
+      popular: false
     }
   };
 
@@ -48,19 +99,12 @@ const PricingPage = () => {
   };
 
   const getYearlySavings = (monthly, yearly) => {
+    if (monthly === 0) return { savings: 0, percentage: 0 }; // Free plan
     const monthlyTotal = monthly * 12;
     const savings = monthlyTotal - yearly;
     const percentage = Math.round((savings / monthlyTotal) * 100);
     return { savings, percentage };
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -111,7 +155,7 @@ const PricingPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {Object.entries(availablePlans).map(([tier, plan]) => {
-            const isPopular = tier === 'professional';
+            const isPopular = plan.popular;
             const price = billingInterval === 'yearly' ? plan.price_annual / 12 : plan.price_monthly;
             const yearlyPrice = plan.price_annual;
             const yearlySavings = getYearlySavings(plan.price_monthly, plan.price_annual);
@@ -142,13 +186,22 @@ const PricingPage = () => {
                       </span>
                       <span className="text-base font-medium text-gray-500">/month</span>
                       
-                      {billingInterval === 'yearly' && (
+                      {billingInterval === 'yearly' && yearlyPrice > 0 && (
                         <div className="mt-1">
                           <p className="text-sm text-gray-600">
                             {formatCurrency(yearlyPrice)} billed annually
                           </p>
+                          {yearlySavings.percentage > 0 && (
+                            <p className="text-sm text-green-600 font-medium">
+                              Save {formatCurrency(yearlySavings.savings)} ({yearlySavings.percentage}%)
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {tier === 'free' && (
+                        <div className="mt-1">
                           <p className="text-sm text-green-600 font-medium">
-                            Save {formatCurrency(yearlySavings.savings)} ({yearlySavings.percentage}%)
+                            Forever free
                           </p>
                         </div>
                       )}
@@ -159,10 +212,12 @@ const PricingPage = () => {
                       className={`mt-6 w-full py-3 px-6 border border-transparent rounded-md text-center text-base font-medium transition-colors ${
                         isPopular
                           ? 'bg-red-600 text-white hover:bg-red-700'
+                          : tier === 'free'
+                          ? 'bg-green-600 text-white hover:bg-green-700'
                           : 'bg-gray-800 text-white hover:bg-gray-900'
                       }`}
                     >
-                      {isAuthenticated ? 'Choose this plan' : 'Start free trial'}
+                      {plan.cta}
                       <ArrowRightIcon className="ml-2 h-4 w-4 inline" />
                     </button>
                   </div>
@@ -181,52 +236,22 @@ const PricingPage = () => {
                     ))}
                   </ul>
 
-                  {/* Plan Limits */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h5 className="text-xs font-medium text-gray-900 uppercase tracking-wide">
-                      Usage Limits
-                    </h5>
-                    <div className="mt-3 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Monthly scans</span>
-                        <span className="text-gray-900 font-medium">
-                          {plan.scan_limit ? plan.scan_limit.toLocaleString() : 'Unlimited'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Projects</span>
-                        <span className="text-gray-900 font-medium">
-                          {plan.project_limit ? plan.project_limit : 'Unlimited'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Team members</span>
-                        <span className="text-gray-900 font-medium">
-                          {plan.user_limit ? plan.user_limit : 'Unlimited'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">API access</span>
-                        <span className="text-gray-900 font-medium">
-                          {plan.api_access ? (
-                            <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XMarkIcon className="h-4 w-4 text-gray-400" />
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Priority support</span>
-                        <span className="text-gray-900 font-medium">
-                          {plan.priority_support ? (
-                            <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XMarkIcon className="h-4 w-4 text-gray-400" />
-                          )}
-                        </span>
-                      </div>
+                  {/* Plan Limitations */}
+                  {plan.limitations && plan.limitations.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <h5 className="text-xs font-medium text-gray-900 uppercase tracking-wide">
+                        Limitations
+                      </h5>
+                      <ul className="mt-3 space-y-2">
+                        {plan.limitations.map((limitation, index) => (
+                          <li key={index} className="flex items-start">
+                            <XMarkIcon className="h-4 w-4 text-gray-400 mt-0.5 mr-2 flex-shrink-0" />
+                            <span className="text-sm text-gray-600">{limitation}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             );
