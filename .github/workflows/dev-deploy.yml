@@ -382,21 +382,38 @@ jobs:
         fi
         echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
     
-    - name: Install Playwright
+    - name: Install dependencies
       run: |
         cd frontend
         npm ci
-        npx playwright install --with-deps chromium
+    
+    - name: Install Playwright Browsers
+      run: |
+        cd frontend
+        echo "📦 Installing Playwright browsers..."
+        # Install Playwright browsers
+        npx playwright install chromium
+        # Install system dependencies 
+        sudo npx playwright install-deps chromium
+        echo "✅ Playwright installation complete"
+        # Verify installation
+        npx playwright --version
     
     - name: Run E2E tests
       run: |
         cd frontend
         echo "🧪 Running E2E tests against: ${{ steps.get-frontend-url.outputs.frontend_url }}"
         
+        # Verify Playwright installation
+        echo "🔍 Checking Playwright installation..."
+        npx playwright --version
+        ls -la ~/.cache/ms-playwright/ || echo "Playwright cache not found"
+        
         # Verify the frontend URL is accessible
         curl -I "${{ steps.get-frontend-url.outputs.frontend_url }}" || echo "Frontend URL not accessible yet, continuing with tests..."
         
         # Run Playwright tests
+        echo "🚀 Starting Playwright tests..."
         BASE_URL=${{ steps.get-frontend-url.outputs.frontend_url }} npx playwright test --project=chromium
       env:
         CI: true
