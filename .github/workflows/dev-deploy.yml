@@ -172,57 +172,31 @@ jobs:
       run: |
         sam build --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml
     
-    - name: Check and cleanup failed stack
+    - name: Handle problematic stacks
       run: |
-        STACK_NAME="themisguard-api-${{ env.SAM_CONFIG_ENV }}"
-        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        BASE_STACK_NAME="themisguard-api-${{ env.SAM_CONFIG_ENV }}"
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$BASE_STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
         
         if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" || "$STACK_STATUS" == "ROLLBACK_FAILED" || "$STACK_STATUS" == "DELETE_FAILED" ]]; then
-          echo "🧹 Stack is in $STACK_STATUS state, attempting deletion..."
+          echo "🚨 Stack $BASE_STACK_NAME is in $STACK_STATUS state"
+          echo "💡 Using timestamped stack name to avoid conflicts..."
           
-          # For DELETE_FAILED, try to identify and retain problematic resources
-          if [[ "$STACK_STATUS" == "DELETE_FAILED" ]]; then
-            echo "🔍 Checking for resources that failed to delete..."
-            
-            # Get failed resources
-            FAILED_RESOURCES=$(aws cloudformation describe-stack-events --stack-name "$STACK_NAME" \
-              --query 'StackEvents[?ResourceStatus==`DELETE_FAILED`].LogicalResourceId' \
-              --output text | tr '\t' ',' | sed 's/,$//')
-            
-            if [[ -n "$FAILED_RESOURCES" ]]; then
-              echo "⚠️ Found failed resources: $FAILED_RESOURCES"
-              echo "🔄 Attempting force deletion by retaining problematic resources..."
-              
-              # Convert comma-separated list to array format for AWS CLI
-              RETAIN_RESOURCES=$(echo "$FAILED_RESOURCES" | tr ',' '\n' | sort -u | tr '\n' ' ')
-              
-              # Delete stack while retaining problematic resources
-              aws cloudformation delete-stack --stack-name "$STACK_NAME" --retain-resources $RETAIN_RESOURCES
-            else
-              aws cloudformation delete-stack --stack-name "$STACK_NAME"
-            fi
-          else
-            aws cloudformation delete-stack --stack-name "$STACK_NAME"
-          fi
+          # Create new stack name with timestamp
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          NEW_STACK_NAME="${BASE_STACK_NAME}-${TIMESTAMP}"
           
-          # Wait for deletion with timeout
-          echo "⏳ Waiting for stack deletion (timeout: 10 minutes)..."
-          if timeout 600 aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"; then
-            echo "✅ Stack deleted successfully"
-          else
-            echo "⚠️ Stack deletion timed out or failed, but continuing with deployment..."
-            NEW_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
-            echo "📊 Current stack status: $NEW_STATUS"
-            
-            if [[ "$NEW_STATUS" != "DOES_NOT_EXIST" ]]; then
-              echo "🚨 Warning: Stack still exists in $NEW_STATUS state"
-              echo "💡 Manual cleanup may be required for resources: $FAILED_RESOURCES"
-            fi
-          fi
+          echo "📝 New stack name: $NEW_STACK_NAME"
+          echo "STACK_NAME=$NEW_STACK_NAME" >> $GITHUB_ENV
+          
+          # Note: Old failed stack will remain for manual cleanup
+          echo "⚠️ Old stack $BASE_STACK_NAME left for manual cleanup"
+          
         elif [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
-          echo "📝 Stack does not exist, will create new one"
+          echo "📝 Stack does not exist, using standard name"
+          echo "STACK_NAME=$BASE_STACK_NAME" >> $GITHUB_ENV
         else
-          echo "📊 Stack status: $STACK_STATUS"
+          echo "📊 Stack status: $STACK_STATUS - using standard name"
+          echo "STACK_NAME=$BASE_STACK_NAME" >> $GITHUB_ENV
         fi
     
     - name: Deploy to AWS
@@ -230,6 +204,7 @@ jobs:
         sam deploy \
           --config-env ${{ env.SAM_CONFIG_ENV }} \
           --template template.yaml \
+          --stack-name ${{ env.STACK_NAME }} \
           --resolve-s3 \
           --no-confirm-changeset \
           --no-fail-on-empty-changeset \
@@ -241,7 +216,7 @@ jobs:
     - name: Get API Gateway URL
       id: get-url
       run: |
-        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue' 2>/dev/null || echo "")
+        API_URL=$(sam list stack-outputs --stack-name ${{ env.STACK_NAME }} --template template.yaml --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue' 2>/dev/null || echo "")
         if [[ -z "$API_URL" ]]; then
           API_URL="http://localhost:3001"
           echo "⚠️ Could not get API URL, using default"
