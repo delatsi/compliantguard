@@ -58,7 +58,7 @@ const GoogleSSO = ({ onSuccess, onError, disabled = false }) => {
     }
   }, [login, onSuccess, onError]);
 
-  const handleManualGoogleLogin = async () => {
+  const handleManualGoogleLogin = useCallback(async () => {
     // Fallback for development - simulate Google login
     try {
       const mockUser = {
