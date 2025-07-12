@@ -55,12 +55,6 @@ Resources:
             Transitions:
               - TransitionInDays: 30
                 StorageClass: STANDARD_IA
-      NotificationConfiguration:
-        CloudWatchConfigurations:
-          - Event: s3:ObjectCreated:*
-            CloudWatchConfiguration:
-              LogGroupName: !Ref FrontendLogGroup
-      DeletionPolicy: !If [IsProduction, Retain, Delete]
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -70,6 +64,7 @@ Resources:
           Value: delatsi-llc
         - Key: Component
           Value: frontend
+    DeletionPolicy: !If [IsProduction, Retain, Delete]
 
   # S3 Bucket Policy for CloudFront OAI
   FrontendBucketPolicy:

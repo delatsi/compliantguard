@@ -5,6 +5,25 @@ const GoogleSSO = ({ onSuccess, onError, disabled = false }) => {
   const googleButtonRef = useRef(null);
   const { login } = useAuth();
 
+  const handleCredentialResponse = useCallback(async (response) => {
+    try {
+      // Decode the JWT token from Google
+      const userInfo = JSON.parse(atob(response.credential.split('.')[1]));
+      
+      // Mock successful login for development
+      const mockLoginResult = await login(userInfo.email, 'google-sso-password');
+      
+      if (mockLoginResult.success) {
+        onSuccess?.(userInfo);
+      } else {
+        onError?.(new Error('SSO login failed'));
+      }
+    } catch (error) {
+      console.error('Google SSO error:', error);
+      onError?.(error);
+    }
+  }, [login, onSuccess, onError]);
+
   useEffect(() => {
     // Load Google Identity Services script
     const script = document.createElement('script');
@@ -38,25 +57,6 @@ const GoogleSSO = ({ onSuccess, onError, disabled = false }) => {
       }
     };
   }, [handleCredentialResponse]);
-
-  const handleCredentialResponse = useCallback(async (response) => {
-    try {
-      // Decode the JWT token from Google
-      const userInfo = JSON.parse(atob(response.credential.split('.')[1]));
-      
-      // Mock successful login for development
-      const mockLoginResult = await login(userInfo.email, 'google-sso-password');
-      
-      if (mockLoginResult.success) {
-        onSuccess?.(userInfo);
-      } else {
-        onError?.(new Error('SSO login failed'));
-      }
-    } catch (error) {
-      console.error('Google SSO error:', error);
-      onError?.(error);
-    }
-  }, [login, onSuccess, onError]);
 
   const handleManualGoogleLogin = useCallback(async () => {
     // Fallback for development - simulate Google login

@@ -250,6 +250,40 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
         aws-region: ${{ env.AWS_REGION }}
     
+    - name: Deploy frontend infrastructure
+      run: |
+        FRONTEND_STACK_NAME="compliantguard-frontend-${{ env.SAM_CONFIG_ENV }}"
+        
+        # Check if frontend stack exists
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$FRONTEND_STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        
+        if [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
+          echo "📦 Creating frontend infrastructure stack..."
+          aws cloudformation create-stack \
+            --stack-name "$FRONTEND_STACK_NAME" \
+            --template-body file://frontend-template.yaml \
+            --parameters ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} \
+                        ParameterKey=ProjectName,ParameterValue=compliantguard \
+            --capabilities CAPABILITY_IAM \
+            --tags Key=Environment,Value=${{ env.SAM_CONFIG_ENV }} \
+                   Key=Project,Value=CompliantGuard \
+                   Key=ManagedBy,Value=GitHubActions
+          
+          echo "⏳ Waiting for frontend infrastructure stack creation..."
+          aws cloudformation wait stack-create-complete --stack-name "$FRONTEND_STACK_NAME"
+        else
+          echo "📦 Frontend infrastructure stack exists with status: $STACK_STATUS"
+          if [[ "$STACK_STATUS" == "UPDATE_ROLLBACK_COMPLETE" || "$STACK_STATUS" == "CREATE_FAILED" ]]; then
+            echo "⚠️ Stack in failed state, attempting to update..."
+            aws cloudformation update-stack \
+              --stack-name "$FRONTEND_STACK_NAME" \
+              --template-body file://frontend-template.yaml \
+              --parameters ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} \
+                          ParameterKey=ProjectName,ParameterValue=compliantguard \
+              --capabilities CAPABILITY_IAM || echo "Update failed, continuing..."
+          fi
+        fi
+    
     - name: Get backend API URL
       id: get-api-url
       run: |
@@ -274,26 +308,38 @@ jobs:
     - name: Deploy to S3
       run: |
         cd frontend
-        BUCKET_NAME="themisguard-frontend-dev"
+        FRONTEND_STACK_NAME="compliantguard-frontend-${{ env.SAM_CONFIG_ENV }}"
         
-        # Check if bucket exists
-        if aws s3 ls "s3://$BUCKET_NAME" > /dev/null 2>&1; then
-          aws s3 sync dist/ "s3://$BUCKET_NAME" --delete
-          aws s3 cp "s3://$BUCKET_NAME/index.html" "s3://$BUCKET_NAME/index.html" \
-            --metadata-directive REPLACE \
-            --cache-control "no-cache, no-store, must-revalidate" || echo "Cache headers update failed"
-        else
-          echo "⚠️ S3 bucket $BUCKET_NAME not found, skipping frontend deployment"
+        # Get S3 bucket name from CloudFormation stack
+        BUCKET_NAME=$(aws cloudformation describe-stacks \
+          --stack-name "$FRONTEND_STACK_NAME" \
+          --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucketName`].OutputValue' \
+          --output text 2>/dev/null || echo "")
+        
+        if [[ -z "$BUCKET_NAME" ]]; then
+          echo "❌ Could not get S3 bucket name from stack $FRONTEND_STACK_NAME"
+          exit 1
         fi
+        
+        echo "📦 Deploying to S3 bucket: $BUCKET_NAME"
+        aws s3 sync dist/ "s3://$BUCKET_NAME" --delete
+        
+        # Set cache headers for index.html (no cache)
+        aws s3 cp "s3://$BUCKET_NAME/index.html" "s3://$BUCKET_NAME/index.html" \
+          --metadata-directive REPLACE \
+          --cache-control "no-cache, no-store, must-revalidate" \
+          --content-type "text/html"
     
     - name: Invalidate CloudFront
       run: |
+        FRONTEND_STACK_NAME="compliantguard-frontend-${{ env.SAM_CONFIG_ENV }}"
         DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
-          --stack-name themisguard-frontend-dev \
-          --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue' \
+          --stack-name "$FRONTEND_STACK_NAME" \
+          --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
           --output text 2>/dev/null || echo "")
         
         if [[ -n "$DISTRIBUTION_ID" && "$DISTRIBUTION_ID" != "None" ]]; then
+          echo "🔄 Invalidating CloudFront distribution: $DISTRIBUTION_ID"
           aws cloudfront create-invalidation \
             --distribution-id $DISTRIBUTION_ID \
             --paths "/*" || echo "CloudFront invalidation failed"
@@ -324,10 +370,16 @@ jobs:
     - name: Get frontend URL
       id: get-frontend-url
       run: |
+        FRONTEND_STACK_NAME="compliantguard-frontend-${{ env.SAM_CONFIG_ENV }}"
         FRONTEND_URL=$(aws cloudformation describe-stacks \
-          --stack-name themisguard-frontend-dev \
-          --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' \
-          --output text 2>/dev/null || echo "http://localhost:3000")
+          --stack-name "$FRONTEND_STACK_NAME" \
+          --query 'Stacks[0].Outputs[?OutputKey==`FrontendURL`].OutputValue' \
+          --output text 2>/dev/null || echo "")
+        
+        if [[ -z "$FRONTEND_URL" ]]; then
+          FRONTEND_URL="https://localhost:5173"
+          echo "⚠️ Could not get frontend URL, using default"
+        fi
         echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
     
     - name: Install Playwright

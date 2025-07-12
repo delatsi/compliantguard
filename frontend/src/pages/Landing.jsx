@@ -71,6 +71,7 @@ const Landing = () => {
               <Link
                 to="/register"
                 className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium"
+                onClick={() => console.log('Header register link clicked')}
               >
                 Get Started
               </Link>
