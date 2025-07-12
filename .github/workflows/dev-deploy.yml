@@ -391,6 +391,12 @@ jobs:
     - name: Run E2E tests
       run: |
         cd frontend
+        echo "🧪 Running E2E tests against: ${{ steps.get-frontend-url.outputs.frontend_url }}"
+        
+        # Verify the frontend URL is accessible
+        curl -I "${{ steps.get-frontend-url.outputs.frontend_url }}" || echo "Frontend URL not accessible yet, continuing with tests..."
+        
+        # Run Playwright tests
         BASE_URL=${{ steps.get-frontend-url.outputs.frontend_url }} npx playwright test --project=chromium
       env:
         CI: true

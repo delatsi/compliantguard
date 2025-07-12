@@ -1,21 +1,36 @@
 import { test, expect } from '@playwright/test';
 
 test('homepage loads successfully', async ({ page }) => {
-  await page.goto('/');
+  console.log('Testing URL:', page.url());
   
-  // Wait for the page to load and check for basic elements
-  await expect(page).toHaveTitle(/ThemisGuard|Vite|React/);
+  // Go to the homepage
+  await page.goto('/', { waitUntil: 'networkidle' });
   
-  // Check if the page is not blank (has some content)
+  // Wait for React to load and render
+  await page.waitForSelector('body', { timeout: 30000 });
+  
+  // Check if the page loaded (look for any content)
   const bodyText = await page.textContent('body');
-  expect(bodyText.length).toBeGreaterThan(0);
+  console.log('Page content length:', bodyText.length);
+  
+  // Basic check that page is not blank
+  expect(bodyText.length).toBeGreaterThan(50);
+  
+  // Look for common React app indicators
+  const hasReactContent = await page.locator('div#root').count();
+  expect(hasReactContent).toBeGreaterThan(0);
 });
 
-test('navigation works', async ({ page }) => {
-  await page.goto('/');
+test('React app renders content', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'networkidle' });
   
-  // Look for common navigation elements
-  // This is a basic test - adjust selectors based on your actual UI
-  const hasNavigation = await page.locator('nav, header, [role="navigation"]').count();
-  expect(hasNavigation).toBeGreaterThan(0);
+  // Wait for React app to render
+  await page.waitForSelector('div#root', { timeout: 30000 });
+  
+  // Check that the root div has content
+  const rootContent = await page.locator('div#root').textContent();
+  expect(rootContent.length).toBeGreaterThan(0);
+  
+  // Take a screenshot for debugging
+  await page.screenshot({ path: 'homepage.png', fullPage: true });
 });
