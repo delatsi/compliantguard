@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAdmin } from '../contexts/AdminContext';
 import {
   UsersIcon,
@@ -22,9 +22,9 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     loadDashboardData();
-  }, [selectedTimeRange]);
+  }, [selectedTimeRange, loadDashboardData]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setRefreshing(true);
     try {
       // Simulate API delay
@@ -36,7 +36,7 @@ const AdminDashboard = () => {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [selectedTimeRange]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const GoogleSSO = ({ onSuccess, onError, disabled = false }) => {
@@ -37,9 +37,9 @@ const GoogleSSO = ({ onSuccess, onError, disabled = false }) => {
         script.parentNode.removeChild(script);
       }
     };
-  }, []);
+  }, [handleCredentialResponse]);
 
-  const handleCredentialResponse = async (response) => {
+  const handleCredentialResponse = useCallback(async (response) => {
     try {
       // Decode the JWT token from Google
       const userInfo = JSON.parse(atob(response.credential.split('.')[1]));
@@ -78,7 +78,7 @@ const GoogleSSO = ({ onSuccess, onError, disabled = false }) => {
     } catch (error) {
       onError?.(error);
     }
-  };
+  }, [login, onSuccess, onError]);
 
   return (
     <div className="w-full">

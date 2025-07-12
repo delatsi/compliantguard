@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AdminContext = createContext();
 
@@ -25,9 +25,9 @@ export const AdminProvider = ({ children }) => {
       // Verify token is still valid (in real app, this would call API)
       validateAdminSession(storedAdminToken);
     }
-  }, []);
+  }, [validateAdminSession]);
 
-  const validateAdminSession = async (token) => {
+  const validateAdminSession = useCallback(async (token) => {
     try {
       // In real implementation, this would validate with backend
       // For demo purposes, we'll simulate admin validation
@@ -50,11 +50,11 @@ export const AdminProvider = ({ children }) => {
           ]
         });
       }
-    } catch (error) {
+    } catch {
       console.error('Admin session validation failed:', error);
       logoutAdmin();
     }
-  };
+  }, []);
 
   const loginAdmin = async (credentials) => {
     try {
@@ -75,7 +75,7 @@ export const AdminProvider = ({ children }) => {
           error: 'Invalid admin credentials'
         };
       }
-    } catch (error) {
+    } catch {
       return {
         success: false,
         error: 'Login failed. Please try again.'
@@ -119,7 +119,7 @@ export const AdminProvider = ({ children }) => {
           error: 'Invalid 2FA code'
         };
       }
-    } catch (error) {
+    } catch {
       return {
         success: false,
         error: '2FA verification failed'

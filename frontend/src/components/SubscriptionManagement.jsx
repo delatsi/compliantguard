@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   CreditCardIcon,
@@ -25,9 +25,9 @@ const SubscriptionManagement = () => {
     if (isAuthenticated) {
       loadSubscriptionData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadSubscriptionData]);
 
-  const loadSubscriptionData = async () => {
+  const loadSubscriptionData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -52,13 +52,13 @@ const SubscriptionManagement = () => {
       setUsage(usageData);
       setAvailablePlans(plansData.plans);
       
-    } catch (err) {
+    } catch {
       setError('Failed to load subscription data');
       console.error('Subscription data error:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const handleSubscribe = async (planTier, interval = 'monthly') => {
     try {
@@ -84,7 +84,7 @@ const SubscriptionManagement = () => {
         throw new Error('Failed to create subscription');
       }
       
-    } catch (err) {
+    } catch {
       setError('Failed to create subscription');
     } finally {
       setChangingPlan(false);
@@ -116,7 +116,7 @@ const SubscriptionManagement = () => {
         throw new Error('Failed to change subscription');
       }
       
-    } catch (err) {
+    } catch {
       setError('Failed to change subscription');
     } finally {
       setChangingPlan(false);
@@ -146,7 +146,7 @@ const SubscriptionManagement = () => {
         throw new Error('Failed to cancel subscription');
       }
       
-    } catch (err) {
+    } catch {
       setError('Failed to cancel subscription');
     }
   };
@@ -169,7 +169,7 @@ const SubscriptionManagement = () => {
         window.open(data.portal_url, '_blank');
       }
       
-    } catch (err) {
+    } catch {
       setError('Failed to open billing portal');
     }
   };

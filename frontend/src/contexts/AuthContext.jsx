@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: 'SET_LOADING', loading: true });
       const response = await authAPI.verifyToken(token);
       dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.user, token });
-    } catch (error) {
+    } catch {
       localStorage.removeItem('token');
       dispatch({ type: 'LOGOUT' });
     } finally {
