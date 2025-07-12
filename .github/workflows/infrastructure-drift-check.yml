@@ -1,0 +1,202 @@
+name: Infrastructure Drift Detection
+
+on:
+  schedule:
+    # Run weekly at 8 AM UTC (12:05 AM PST)
+    - cron: '5 0 * * 6'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to check for drift'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      detailed_scan:
+        description: 'Run detailed resource compliance scan'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  drift-detection:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJson(format('["{0}"]', github.event.inputs.environment)) || fromJson('["dev", "staging", "prod"]') }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_{0}', upper(matrix.environment))] }}
+        aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_{0}', upper(matrix.environment))] }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Check CloudFormation stack drift
+      id: drift-check
+      run: |
+        echo "🔍 Checking drift for ${{ matrix.environment }} environment..."
+        
+        BACKEND_STACK="themisguard-api-${{ matrix.environment }}"
+        FRONTEND_STACK="themisguard-frontend-${{ matrix.environment }}"
+        
+        # Function to check stack drift
+        check_stack_drift() {
+          local stack_name=$1
+          local stack_type=$2
+          
+          if aws cloudformation describe-stacks --stack-name "$stack_name" >/dev/null 2>&1; then
+            echo "📊 Checking drift for $stack_type stack: $stack_name"
+            
+            # Start drift detection
+            DRIFT_ID=$(aws cloudformation detect-stack-drift --stack-name "$stack_name" --query 'StackDriftDetectionId' --output text)
+            
+            # Wait for drift detection to complete
+            echo "⏳ Waiting for drift detection to complete..."
+            aws cloudformation wait stack-drift-detection-complete --stack-drift-detection-id "$DRIFT_ID"
+            
+            # Get drift results
+            DRIFT_STATUS=$(aws cloudformation describe-stack-drift-detection-status \
+              --stack-drift-detection-id "$DRIFT_ID" \
+              --query 'StackDriftStatus' \
+              --output text)
+            
+            echo "drift_status_${stack_type}=$DRIFT_STATUS" >> $GITHUB_OUTPUT
+            
+            if [ "$DRIFT_STATUS" = "DRIFTED" ]; then
+              echo "🚨 DRIFT DETECTED in $stack_type stack: $stack_name"
+              
+              # Get detailed drift information
+              aws cloudformation describe-stack-resource-drifts \
+                --stack-name "$stack_name" \
+                --stack-resource-drift-status-filters MODIFIED DELETED \
+                --query 'StackResourceDrifts[*].[LogicalResourceId,ResourceType,StackResourceDriftStatus,ActualProperties]' \
+                --output table > "/tmp/${stack_type}_drift_details.txt"
+              
+              echo "📝 Drift details for $stack_type:"
+              cat "/tmp/${stack_type}_drift_details.txt"
+              
+              return 1
+            else
+              echo "✅ No drift detected in $stack_type stack: $stack_name"
+              return 0
+            fi
+          else
+            echo "⚠️ Stack $stack_name does not exist, skipping drift check"
+            return 0
+          fi
+        }
+        
+        # Check both stacks
+        BACKEND_EXIT_CODE=0
+        FRONTEND_EXIT_CODE=0
+        
+        check_stack_drift "$BACKEND_STACK" "backend" || BACKEND_EXIT_CODE=$?
+        check_stack_drift "$FRONTEND_STACK" "frontend" || FRONTEND_EXIT_CODE=$?
+        
+        # Set overall status
+        if [ $BACKEND_EXIT_CODE -ne 0 ] || [ $FRONTEND_EXIT_CODE -ne 0 ]; then
+          echo "drift_detected=true" >> $GITHUB_OUTPUT
+          echo "🚨 Infrastructure drift detected in ${{ matrix.environment }} environment!"
+          exit 1
+        else
+          echo "drift_detected=false" >> $GITHUB_OUTPUT
+          echo "✅ No infrastructure drift detected in ${{ matrix.environment }} environment"
+        fi
+    
+    - name: Check resource compliance
+      if: github.event.inputs.detailed_scan == 'true' || github.event_name == 'schedule'
+      run: |
+        echo "🔒 Running resource compliance checks for ${{ matrix.environment }}..."
+        
+        # Check S3 bucket security
+        echo "📦 Checking S3 bucket security settings..."
+        aws s3api get-public-access-block --bucket "themisguard-api-${{ matrix.environment }}-reports-$(aws sts get-caller-identity --query Account --output text)" \
+          --query 'PublicAccessBlockConfiguration' || echo "⚠️ Could not check S3 public access block"
+        
+        # Check DynamoDB encryption
+        echo "🔐 Checking DynamoDB encryption..."
+        aws dynamodb describe-table --table-name "themisguard-api-${{ matrix.environment }}-users" \
+          --query 'Table.SSEDescription' || echo "⚠️ Could not check DynamoDB encryption"
+        
+        # Check Lambda function security
+        echo "🔧 Checking Lambda function configuration..."
+        aws lambda get-function-configuration --function-name "themisguard-api-${{ matrix.environment }}-api" \
+          --query '{Runtime:Runtime,ReservedConcurrency:ReservedConcurrencyExecutions,Environment:Environment}' \
+          || echo "⚠️ Could not check Lambda configuration"
+        
+        # Check Cognito User Pool security
+        echo "👤 Checking Cognito User Pool security..."
+        aws cognito-idp describe-user-pool --user-pool-id $(aws cognito-idp list-user-pools --max-items 10 \
+          --query "UserPools[?contains(Name, 'themisguard-api-${{ matrix.environment }}')].Id" --output text) \
+          --query 'UserPool.Policies' || echo "⚠️ Could not check Cognito configuration"
+    
+    - name: Upload drift artifacts
+      if: failure() && steps.drift-check.outputs.drift_detected == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: drift-details-${{ matrix.environment }}
+        path: /tmp/*_drift_details.txt
+        retention-days: 30
+    
+    - name: Create drift summary
+      if: always()
+      run: |
+        echo "## 🏗️ Infrastructure Drift Report - ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "**Backend Stack:** themisguard-api-${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Frontend Stack:** themisguard-frontend-${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ steps.drift-check.outputs.drift_detected }}" == "true" ]]; then
+          echo "### 🚨 Drift Detected!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Infrastructure configuration has drifted from the expected state." >> $GITHUB_STEP_SUMMARY
+          echo "Please review the drift details and take corrective action." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Recommended Actions:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the drift details in the workflow logs" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update CloudFormation templates if changes are intentional" >> $GITHUB_STEP_SUMMARY
+          echo "3. Redeploy the stack to restore the expected configuration" >> $GITHUB_STEP_SUMMARY
+          echo "4. Investigate how the drift occurred to prevent future issues" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ✅ No Drift Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All infrastructure resources match their expected configuration." >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Next Check:** Tomorrow at 6 AM UTC" >> $GITHUB_STEP_SUMMARY
+
+  notify-on-drift:
+    needs: drift-detection
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+    - name: Notify team of drift
+      run: |
+        echo "🚨 Infrastructure drift detected!"
+        echo "Please check the workflow logs and take corrective action."
+        echo "Drift detection failed for one or more environments."
+        
+        # In a real setup, you might send notifications to:
+        # - Slack webhook
+        # - Email via SES
+        # - PagerDuty alert
+        # - Teams webhook
