@@ -387,22 +387,19 @@ jobs:
         cd frontend
         npm ci
     
-    - name: Cache Playwright browsers
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-        restore-keys: |
-          playwright-${{ runner.os }}-
-    
     - name: Install Playwright Browsers
       run: |
         cd frontend
-        # Install Playwright browsers with system dependencies
-        npx playwright install chromium --with-deps
-        # Verify installation
-        npx playwright --version
-        echo "Playwright installation complete"
+        npx playwright install --with-deps chromium
+        # Debug: Check what was actually installed
+        echo "Playwright cache contents:"
+        ls -la ~/.cache/ms-playwright/ || echo "No cache directory"
+        # Find all chrome/chromium executables
+        echo "Chrome executables found:"
+        find ~/.cache/ms-playwright -name "*chrome*" -o -name "*chromium*" 2>/dev/null | head -20 || echo "No chrome executables found"
+        # Check the specific path that's failing
+        echo "Checking expected path:"
+        ls -la ~/.cache/ms-playwright/chromium_headless_shell-1181/chrome-linux/ 2>/dev/null || echo "Expected path does not exist"
     
     - name: Run E2E tests
       run: |
