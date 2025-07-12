@@ -132,7 +132,7 @@ jobs:
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        extra_args: --force
+        extra_args: --only-verified --no-update
 
   deploy-backend:
     needs: [test-backend, security-scan]

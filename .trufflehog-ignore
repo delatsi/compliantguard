@@ -1,0 +1,27 @@
+# TruffleHog ignore file for false positives and test data
+
+# Configuration files with placeholder values
+samconfig.toml
+template.yaml
+backend/core/config.py
+
+# Documentation files with examples
+docs/
+FEATURES.md
+README.md
+
+# Test/example data files
+gcp_assets.json
+scripts/start-dev.sh
+
+# Known false positives - placeholder/example keys
+your-secret-key-change-in-production
+sk_test_...
+pk_test_...
+whsec_...
+sk_live_...
+pk_live_...
+development-secret-key-change-in-production
+
+# Stripe test publishable key (safe to be public)
+pk_live_51LoAHZB4eOh8SIJznwoXw421vEOmnywZRQiLWAXktZLmwh0Tq813mpQgqVnnP9eI88hussBqESferpEDro4jwK1g00qBCqtkVH

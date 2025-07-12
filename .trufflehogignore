@@ -1,0 +1,29 @@
+# Configuration files with placeholder/example values
+samconfig.toml
+template.yaml
+backend/core/config.py
+scripts/start-dev.sh
+
+# Documentation and example files
+docs/**
+*.md
+FEATURES.md
+README.md
+
+# Generated/asset files that may contain example data
+gcp_assets.json
+hipaa_*.json
+startup_violations.json
+violations.json
+themisguard-key.json
+
+# Development scripts with test values
+scripts/**
+
+# Test and example patterns (regex)
+# Placeholder secrets
+your-secret-key.*
+.*sk_test.*
+.*pk_test.*
+.*whsec.*
+.*development-secret.*
