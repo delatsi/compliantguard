@@ -16,17 +16,6 @@ export const AdminProvider = ({ children }) => {
   const [is2FAVerified, setIs2FAVerified] = useState(false);
   const [adminToken, setAdminToken] = useState(null);
 
-  // Check admin session on component mount
-  useEffect(() => {
-    const storedAdminToken = localStorage.getItem('admin_token');
-    const stored2FA = localStorage.getItem('admin_2fa_verified');
-    
-    if (storedAdminToken && stored2FA === 'true') {
-      // Verify token is still valid (in real app, this would call API)
-      validateAdminSession(storedAdminToken);
-    }
-  }, [validateAdminSession]);
-
   const validateAdminSession = useCallback(async (token) => {
     try {
       // In real implementation, this would validate with backend
@@ -54,7 +43,18 @@ export const AdminProvider = ({ children }) => {
       console.error('Admin session validation failed');
       logoutAdmin();
     }
-  }, [logoutAdmin]);
+  }, []);
+
+  // Check admin session on component mount
+  useEffect(() => {
+    const storedAdminToken = localStorage.getItem('admin_token');
+    const stored2FA = localStorage.getItem('admin_2fa_verified');
+    
+    if (storedAdminToken && stored2FA === 'true') {
+      // Verify token is still valid (in real app, this would call API)
+      validateAdminSession(storedAdminToken);
+    }
+  }, [validateAdminSession]);
 
   const loginAdmin = async (credentials) => {
     try {
