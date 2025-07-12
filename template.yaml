@@ -10,7 +10,6 @@ Globals:
     Environment:
       Variables:
         ENVIRONMENT: !Ref Environment
-        AWS_REGION: !Ref AWS::Region
         DYNAMODB_TABLE_NAME: !Sub "${AWS::StackName}-scans"
         S3_BUCKET_NAME: !Sub "${AWS::StackName}-reports"
         JWT_SECRET_KEY: !Ref JWTSecretKey
