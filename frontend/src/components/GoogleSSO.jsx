@@ -56,7 +56,7 @@ const GoogleSSO = ({ onSuccess, onError, disabled = false }) => {
       console.error('Google SSO error:', error);
       onError?.(error);
     }
-  };
+  }, [login, onSuccess, onError]);
 
   const handleManualGoogleLogin = async () => {
     // Fallback for development - simulate Google login
