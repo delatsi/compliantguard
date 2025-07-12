@@ -387,27 +387,27 @@ jobs:
         cd frontend
         npm ci
     
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+        restore-keys: |
+          playwright-${{ runner.os }}-
+    
     - name: Install Playwright Browsers
       run: |
         cd frontend
-        echo "📦 Installing Playwright browsers..."
-        # Install Playwright browsers
-        npx playwright install chromium
-        # Install system dependencies 
-        sudo npx playwright install-deps chromium
-        echo "✅ Playwright installation complete"
+        # Install Playwright browsers with system dependencies
+        npx playwright install chromium --with-deps
         # Verify installation
         npx playwright --version
+        echo "Playwright installation complete"
     
     - name: Run E2E tests
       run: |
         cd frontend
         echo "🧪 Running E2E tests against: ${{ steps.get-frontend-url.outputs.frontend_url }}"
-        
-        # Verify Playwright installation
-        echo "🔍 Checking Playwright installation..."
-        npx playwright --version
-        ls -la ~/.cache/ms-playwright/ || echo "Playwright cache not found"
         
         # Verify the frontend URL is accessible
         curl -I "${{ steps.get-frontend-url.outputs.frontend_url }}" || echo "Frontend URL not accessible yet, continuing with tests..."
