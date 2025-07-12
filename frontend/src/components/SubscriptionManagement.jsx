@@ -54,7 +54,7 @@ const SubscriptionManagement = () => {
       
     } catch {
       setError('Failed to load subscription data');
-      console.error('Subscription data error:', err);
+      console.error('Subscription data error');
     } finally {
       setLoading(false);
     }

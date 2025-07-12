@@ -51,10 +51,10 @@ export const AdminProvider = ({ children }) => {
         });
       }
     } catch {
-      console.error('Admin session validation failed:', error);
+      console.error('Admin session validation failed');
       logoutAdmin();
     }
-  }, []);
+  }, [logoutAdmin]);
 
   const loginAdmin = async (credentials) => {
     try {
