@@ -257,6 +257,7 @@ jobs:
         sam deploy \
           --config-env ${{ env.SAM_CONFIG_ENV }} \
           --template template.yaml \
+          --resolve-s3 \
           --no-confirm-changeset \
           --no-fail-on-empty-changeset \
           --parameter-overrides \
