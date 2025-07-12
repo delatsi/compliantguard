@@ -252,6 +252,22 @@ jobs:
       run: |
         sam build --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml
     
+    - name: Check and cleanup failed stack
+      run: |
+        STACK_NAME="themisguard-api-${{ env.SAM_CONFIG_ENV }}"
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        
+        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
+          echo "🧹 Stack is in ROLLBACK_COMPLETE state, deleting before redeploy..."
+          aws cloudformation delete-stack --stack-name "$STACK_NAME"
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
+          echo "✅ Stack deleted successfully"
+        elif [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
+          echo "📝 Stack does not exist, will create new one"
+        else
+          echo "📊 Stack status: $STACK_STATUS"
+        fi
+    
     - name: Deploy to production
       run: |
         sam deploy \
