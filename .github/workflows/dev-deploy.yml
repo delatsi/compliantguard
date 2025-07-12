@@ -170,14 +170,13 @@ jobs:
     
     - name: Build SAM application
       run: |
-        cd backend
-        sam build --config-env ${{ env.SAM_CONFIG_ENV }}
+        sam build --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml
     
     - name: Deploy to AWS
       run: |
-        cd backend
         sam deploy \
           --config-env ${{ env.SAM_CONFIG_ENV }} \
+          --template template.yaml \
           --no-confirm-changeset \
           --no-fail-on-empty-changeset \
           --parameter-overrides \
@@ -188,8 +187,7 @@ jobs:
     - name: Get API Gateway URL
       id: get-url
       run: |
-        cd backend
-        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue' 2>/dev/null || echo "")
+        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue' 2>/dev/null || echo "")
         if [[ -z "$API_URL" ]]; then
           API_URL="http://localhost:3001"
           echo "⚠️ Could not get API URL, using default"

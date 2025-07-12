@@ -137,8 +137,7 @@ jobs:
     
     - name: Build backend for production
       run: |
-        cd backend
-        sam build --config-env ${{ env.SAM_CONFIG_ENV }}
+        sam build --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml
     
     - name: Install frontend dependencies
       run: |
@@ -251,14 +250,13 @@ jobs:
     
     - name: Build SAM application
       run: |
-        cd backend
-        sam build --config-env ${{ env.SAM_CONFIG_ENV }}
+        sam build --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml
     
     - name: Deploy to production
       run: |
-        cd backend
         sam deploy \
           --config-env ${{ env.SAM_CONFIG_ENV }} \
+          --template template.yaml \
           --no-confirm-changeset \
           --no-fail-on-empty-changeset \
           --parameter-overrides \
@@ -268,12 +266,11 @@ jobs:
     
     - name: Verify deployment
       run: |
-        cd backend
         echo "🔍 Verifying API deployment..."
         sleep 60  # Allow time for deployment to stabilize
         
         # Get API URL
-        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue' || echo "")
+        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue' || echo "")
         
         if [[ -n "$API_URL" ]]; then
           echo "API URL: $API_URL"
