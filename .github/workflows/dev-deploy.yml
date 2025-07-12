@@ -177,11 +177,48 @@ jobs:
         STACK_NAME="themisguard-api-${{ env.SAM_CONFIG_ENV }}"
         STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
         
-        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" || "$STACK_STATUS" == "ROLLBACK_FAILED" ]]; then
-          echo "🧹 Stack is in $STACK_STATUS state, deleting before redeploy..."
-          aws cloudformation delete-stack --stack-name "$STACK_NAME"
-          aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
-          echo "✅ Stack deleted successfully"
+        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" || "$STACK_STATUS" == "ROLLBACK_FAILED" || "$STACK_STATUS" == "DELETE_FAILED" ]]; then
+          echo "🧹 Stack is in $STACK_STATUS state, attempting deletion..."
+          
+          # For DELETE_FAILED, try to identify and retain problematic resources
+          if [[ "$STACK_STATUS" == "DELETE_FAILED" ]]; then
+            echo "🔍 Checking for resources that failed to delete..."
+            
+            # Get failed resources
+            FAILED_RESOURCES=$(aws cloudformation describe-stack-events --stack-name "$STACK_NAME" \
+              --query 'StackEvents[?ResourceStatus==`DELETE_FAILED`].LogicalResourceId' \
+              --output text | tr '\t' ',' | sed 's/,$//')
+            
+            if [[ -n "$FAILED_RESOURCES" ]]; then
+              echo "⚠️ Found failed resources: $FAILED_RESOURCES"
+              echo "🔄 Attempting force deletion by retaining problematic resources..."
+              
+              # Convert comma-separated list to array format for AWS CLI
+              RETAIN_RESOURCES=$(echo "$FAILED_RESOURCES" | tr ',' '\n' | sort -u | tr '\n' ' ')
+              
+              # Delete stack while retaining problematic resources
+              aws cloudformation delete-stack --stack-name "$STACK_NAME" --retain-resources $RETAIN_RESOURCES
+            else
+              aws cloudformation delete-stack --stack-name "$STACK_NAME"
+            fi
+          else
+            aws cloudformation delete-stack --stack-name "$STACK_NAME"
+          fi
+          
+          # Wait for deletion with timeout
+          echo "⏳ Waiting for stack deletion (timeout: 10 minutes)..."
+          if timeout 600 aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"; then
+            echo "✅ Stack deleted successfully"
+          else
+            echo "⚠️ Stack deletion timed out or failed, but continuing with deployment..."
+            NEW_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+            echo "📊 Current stack status: $NEW_STATUS"
+            
+            if [[ "$NEW_STATUS" != "DOES_NOT_EXIST" ]]; then
+              echo "🚨 Warning: Stack still exists in $NEW_STATUS state"
+              echo "💡 Manual cleanup may be required for resources: $FAILED_RESOURCES"
+            fi
+          fi
         elif [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
           echo "📝 Stack does not exist, will create new one"
         else
