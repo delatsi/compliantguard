@@ -557,9 +557,10 @@ Resources:
       ClientName: !Sub "${AWS::StackName}-client"
       UserPoolId: !Ref CognitoUserPool
       GenerateSecret: false
-      SupportedIdentityProviders:
-        - COGNITO
-        - Google
+      SupportedIdentityProviders: !If
+        - HasGoogleSSO
+        - [COGNITO, Google]
+        - [COGNITO]
       CallbackURLs:
         - !Sub "https://${AWS::StackName}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse"
         - "http://localhost:5173/auth/callback"
@@ -582,6 +583,7 @@ Resources:
   # Cognito Identity Provider (Google)
   CognitoIdentityProviderGoogle:
     Type: AWS::Cognito::UserPoolIdentityProvider
+    Condition: HasGoogleSSO
     Properties:
       UserPoolId: !Ref CognitoUserPool
       ProviderName: Google
@@ -613,6 +615,7 @@ Resources:
 Conditions:
   HasCustomDomain: !Not [!Equals [!Ref CustomDomainName, ""]]
   IsProduction: !Equals [!Ref Environment, "prod"]
+  HasGoogleSSO: !Not [!Equals [!Ref GoogleClientId, ""]]
 
 Outputs:
   ApiGatewayUrl:
