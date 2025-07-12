@@ -269,7 +269,7 @@ jobs:
             --template-body file://frontend-template.yaml \
             --parameters ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} \
                         ParameterKey=ProjectName,ParameterValue=compliantguard \
-            --capabilities CAPABILITY_IAM \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
             --tags Key=Environment,Value=${{ env.SAM_CONFIG_ENV }} \
                    Key=Project,Value=CompliantGuard \
                    Key=ManagedBy,Value=GitHubActions
@@ -285,7 +285,7 @@ jobs:
               --template-body file://frontend-template.yaml \
               --parameters ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} \
                           ParameterKey=ProjectName,ParameterValue=compliantguard \
-              --capabilities CAPABILITY_IAM || echo "Update failed, continuing..."
+              --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND || echo "Update failed, continuing..."
           fi
         fi
     
