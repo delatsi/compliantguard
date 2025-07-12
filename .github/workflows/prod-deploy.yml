@@ -185,9 +185,7 @@ jobs:
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        base: main
-        head: HEAD
-        extra_args: --fail
+        extra_args: --force --fail
 
   backup-production:
     needs: [validate-deployment-request, pre-deployment-checks]
