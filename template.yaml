@@ -135,15 +135,15 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
               Resource: 
-                - !Sub "${ScansTable}/index/*"
-                - !Sub "${UsersTable}/index/*"
-                - !Sub "${AdminUsersTable}/index/*"
-                - !Sub "${AdminSessionsTable}/index/*"
-                - !Sub "${AdminAuditTable}/index/*"
-                - !Sub "${SubscriptionsTable}/index/*"
-                - !Sub "${UsageTable}/index/*"
-                - !Sub "${InvoicesTable}/index/*"
-                - !Sub "${WebhookEventsTable}/index/*"
+                - !Sub "${ScansTable.Arn}/index/*"
+                - !Sub "${UsersTable.Arn}/index/*"
+                - !Sub "${AdminUsersTable.Arn}/index/*"
+                - !Sub "${AdminSessionsTable.Arn}/index/*"
+                - !Sub "${AdminAuditTable.Arn}/index/*"
+                - !Sub "${SubscriptionsTable.Arn}/index/*"
+                - !Sub "${UsageTable.Arn}/index/*"
+                - !Sub "${InvoicesTable.Arn}/index/*"
+                - !Sub "${WebhookEventsTable.Arn}/index/*"
 
   # DynamoDB Tables
   ScansTable:
