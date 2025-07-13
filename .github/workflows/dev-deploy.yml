@@ -431,20 +431,18 @@ jobs:
               aws s3 website "s3://$FALLBACK_BUCKET" --index-document index.html --error-document index.html
               
               # Set bucket policy for public read
-              cat > /tmp/bucket-policy.json << EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadGetObject",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::$FALLBACK_BUCKET/*"
-    }
-  ]
-}
-EOF
+              echo '{
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Sid": "PublicReadGetObject",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": "arn:aws:s3:::'"$FALLBACK_BUCKET"'/*"
+                  }
+                ]
+              }' > /tmp/bucket-policy.json
               aws s3api put-bucket-policy --bucket "$FALLBACK_BUCKET" --policy file:///tmp/bucket-policy.json
               
               BUCKET_NAME="$FALLBACK_BUCKET"
