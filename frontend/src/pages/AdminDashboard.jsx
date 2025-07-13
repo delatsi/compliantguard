@@ -341,7 +341,7 @@ const AdminDashboard = () => {
                 <div className="mb-6">
                   <h4 className="text-sm font-medium text-gray-900 mb-3">6-Month Churn Trend</h4>
                   <div className="space-y-2">
-                    {dashboardData.churn_analytics.churn_trend_6_months.map((month, index) => (
+                    {dashboardData.churn_analytics.churn_trend_6_months.map((month) => (
                       <div key={month.month} className="flex items-center justify-between py-2">
                         <span className="text-sm font-medium text-gray-900 w-12">{month.month}</span>
                         <div className="flex items-center space-x-4 flex-1">
@@ -387,7 +387,7 @@ const AdminDashboard = () => {
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-3">Top Churn Reasons</h4>
                     <div className="space-y-2">
-                      {dashboardData.churn_analytics.churn_reasons.slice(0, 4).map((reason, index) => (
+                      {dashboardData.churn_analytics.churn_reasons.slice(0, 4).map((reason) => (
                         <div key={reason.reason} className="flex items-center justify-between">
                           <span className="text-sm text-gray-600 truncate">{reason.reason}</span>
                           <div className="flex items-center space-x-2">
