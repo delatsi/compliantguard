@@ -319,11 +319,21 @@ jobs:
         
         if [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
           echo "📦 Creating frontend infrastructure stack..."
+          # Prepare parameters
+          STACK_PARAMS="ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} ParameterKey=ProjectName,ParameterValue=compliantguard"
+          
+          # Add custom domain parameters if available
+          if [[ -n "${{ secrets.CUSTOM_DOMAIN_NAME }}" && -n "${{ secrets.SSL_CERT_ARN }}" ]]; then
+            echo "🌐 Configuring custom domain: ${{ secrets.CUSTOM_DOMAIN_NAME }}"
+            STACK_PARAMS="$STACK_PARAMS ParameterKey=CustomDomainName,ParameterValue=${{ secrets.CUSTOM_DOMAIN_NAME }} ParameterKey=SSLCertificateArn,ParameterValue=${{ secrets.SSL_CERT_ARN }}"
+          else
+            echo "📝 No custom domain configured, using CloudFront default"
+          fi
+          
           aws cloudformation create-stack \
             --stack-name "$FRONTEND_STACK_NAME" \
             --template-body file://frontend-template.yaml \
-            --parameters ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} \
-                        ParameterKey=ProjectName,ParameterValue=compliantguard \
+            --parameters $STACK_PARAMS \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
             --tags Key=Environment,Value=${{ env.SAM_CONFIG_ENV }} \
                    Key=Project,Value=CompliantGuard \
@@ -335,11 +345,19 @@ jobs:
           echo "📦 Frontend infrastructure stack exists with status: $STACK_STATUS"
           if [[ "$STACK_STATUS" == "UPDATE_ROLLBACK_COMPLETE" || "$STACK_STATUS" == "CREATE_FAILED" ]]; then
             echo "⚠️ Stack in failed state, attempting to update..."
+            # Prepare parameters for update
+            STACK_PARAMS="ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} ParameterKey=ProjectName,ParameterValue=compliantguard"
+            
+            # Add custom domain parameters if available
+            if [[ -n "${{ secrets.CUSTOM_DOMAIN_NAME }}" && -n "${{ secrets.SSL_CERT_ARN }}" ]]; then
+              echo "🌐 Updating with custom domain: ${{ secrets.CUSTOM_DOMAIN_NAME }}"
+              STACK_PARAMS="$STACK_PARAMS ParameterKey=CustomDomainName,ParameterValue=${{ secrets.CUSTOM_DOMAIN_NAME }} ParameterKey=SSLCertificateArn,ParameterValue=${{ secrets.SSL_CERT_ARN }}"
+            fi
+            
             aws cloudformation update-stack \
               --stack-name "$FRONTEND_STACK_NAME" \
               --template-body file://frontend-template.yaml \
-              --parameters ParameterKey=Environment,ParameterValue=${{ env.SAM_CONFIG_ENV }} \
-                          ParameterKey=ProjectName,ParameterValue=compliantguard \
+              --parameters $STACK_PARAMS \
               --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND || echo "Update failed, continuing..."
           fi
         fi
