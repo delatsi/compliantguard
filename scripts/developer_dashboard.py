@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Developer-focused violation analyzer
-Shows specific, actionable violations with fix commands
+Shows specific, actionable violations with fix commands.
 """
 
 import json
