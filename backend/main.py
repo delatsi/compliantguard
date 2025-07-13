@@ -11,6 +11,7 @@ from botocore.exceptions import ClientError
 
 from .core.config import settings
 from .core.auth import verify_token, get_current_user
+from .routes.auth import router as auth_router
 from .models.compliance import ComplianceReport, ViolationSummary
 from .models.admin import AdminDashboardData
 from .models.subscription import (
@@ -27,6 +28,9 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
 )
+
+# Include routers
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
 
 # CORS middleware
 app.add_middleware(
