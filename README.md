@@ -8,6 +8,7 @@ A modern micro SaaS application for automated HIPAA compliance scanning of Googl
 - **Frontend**: React + Vite + TailwindCSS
 - **Database**: DynamoDB + S3
 - **Infrastructure**: AWS SAM CLI
+- **Documentation**: Markdown
 
 ## 🚀 Local Development
 
