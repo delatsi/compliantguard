@@ -370,15 +370,87 @@ jobs:
         cd frontend
         FRONTEND_STACK_NAME="compliantguard-frontend-${{ env.SAM_CONFIG_ENV }}"
         
+        # Debug: Check if stack exists and its status
+        echo "🔍 Debugging frontend stack: $FRONTEND_STACK_NAME"
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$FRONTEND_STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        echo "Stack status: $STACK_STATUS"
+        
+        if [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
+          echo "❌ Frontend stack $FRONTEND_STACK_NAME does not exist"
+          echo "Available stacks:"
+          aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE --query 'StackSummaries[?contains(StackName, `frontend`)].StackName' --output table
+          exit 1
+        fi
+        
+        # Debug: List all outputs from the stack
+        echo "📋 Stack outputs:"
+        aws cloudformation describe-stacks --stack-name "$FRONTEND_STACK_NAME" --query 'Stacks[0].Outputs' --output table || echo "No outputs found"
+        
         # Get S3 bucket name from CloudFormation stack
         BUCKET_NAME=$(aws cloudformation describe-stacks \
           --stack-name "$FRONTEND_STACK_NAME" \
           --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucketName`].OutputValue' \
           --output text 2>/dev/null || echo "")
         
-        if [[ -z "$BUCKET_NAME" ]]; then
-          echo "❌ Could not get S3 bucket name from stack $FRONTEND_STACK_NAME"
-          exit 1
+        echo "Bucket name retrieved: '$BUCKET_NAME'"
+        
+        if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
+          echo "❌ Could not get valid S3 bucket name from stack $FRONTEND_STACK_NAME"
+          echo "Trying alternative output key names..."
+          
+          # Try different possible output key names
+          BUCKET_NAME=$(aws cloudformation describe-stacks \
+            --stack-name "$FRONTEND_STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`S3Bucket`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
+            BUCKET_NAME=$(aws cloudformation describe-stacks \
+              --stack-name "$FRONTEND_STACK_NAME" \
+              --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+              --output text 2>/dev/null || echo "")
+          fi
+          
+          if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
+            echo "⚠️ Could not get bucket from CloudFormation, checking for existing fallback bucket..."
+            
+            # Define consistent fallback bucket name (without timestamp)
+            FALLBACK_BUCKET="compliantguard-frontend-${{ env.SAM_CONFIG_ENV }}-fallback"
+            
+            # Check if fallback bucket already exists
+            if aws s3api head-bucket --bucket "$FALLBACK_BUCKET" 2>/dev/null; then
+              echo "✅ Using existing fallback bucket: $FALLBACK_BUCKET"
+              BUCKET_NAME="$FALLBACK_BUCKET"
+            else
+              echo "📦 Creating new fallback bucket: $FALLBACK_BUCKET"
+              
+              # Create the bucket
+              aws s3 mb "s3://$FALLBACK_BUCKET" --region ${{ env.AWS_REGION }}
+              
+              # Configure bucket for static website hosting
+              aws s3 website "s3://$FALLBACK_BUCKET" --index-document index.html --error-document index.html
+              
+              # Set bucket policy for public read
+              cat > /tmp/bucket-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::$FALLBACK_BUCKET/*"
+    }
+  ]
+}
+EOF
+              aws s3api put-bucket-policy --bucket "$FALLBACK_BUCKET" --policy file:///tmp/bucket-policy.json
+              
+              BUCKET_NAME="$FALLBACK_BUCKET"
+              echo "✅ Created and configured fallback bucket: $BUCKET_NAME"
+            fi
+          fi
         fi
         
         echo "📦 Deploying to S3 bucket: $BUCKET_NAME"
