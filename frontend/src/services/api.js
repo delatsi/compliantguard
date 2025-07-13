@@ -54,4 +54,32 @@ export const userAPI = {
   changePassword: (data) => api.put('/api/v1/user/password', data),
 };
 
+export const gcpAPI = {
+  // Upload GCP credentials via JSON
+  uploadCredentials: (projectId, serviceAccountJson) => 
+    api.post('/api/v1/gcp/credentials', {
+      project_id: projectId,
+      service_account_json: serviceAccountJson
+    }),
+  
+  // Upload GCP credentials via file
+  uploadCredentialsFile: (projectId, file) => {
+    const formData = new FormData();
+    formData.append('project_id', projectId);
+    formData.append('file', file);
+    return api.post('/api/v1/gcp/credentials/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  
+  // List connected GCP projects
+  listProjects: () => api.get('/api/v1/gcp/projects'),
+  
+  // Check project connection status
+  getProjectStatus: (projectId) => api.get(`/api/v1/gcp/projects/${projectId}/status`),
+  
+  // Revoke GCP credentials
+  revokeCredentials: (projectId) => api.delete(`/api/v1/gcp/projects/${projectId}/credentials`),
+};
+
 export default api;

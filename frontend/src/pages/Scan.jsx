@@ -1,15 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { complianceAPI } from '../services/api';
+import { complianceAPI, gcpAPI } from '../services/api';
+import { PlusIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import GCPOnboardingModal from '../components/GCPOnboardingModal';
 
 const Scan = () => {
   const [formData, setFormData] = useState({
     projectId: '',
     scanType: 'full',
   });
+  const [connectedProjects, setConnectedProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    loadConnectedProjects();
+  }, []);
+
+  const loadConnectedProjects = async () => {
+    try {
+      setLoadingProjects(true);
+      const response = await gcpAPI.listProjects();
+      setConnectedProjects(response.data);
+    } catch (err) {
+      console.error('Failed to load connected projects:', err);
+      setConnectedProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -23,7 +45,7 @@ const Scan = () => {
     e.preventDefault();
     
     if (!formData.projectId) {
-      setError('Project ID is required');
+      setError('Please select a GCP project');
       return;
     }
 
@@ -41,6 +63,12 @@ const Scan = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOnboardingComplete = async (projectId) => {
+    await loadConnectedProjects();
+    setFormData(prev => ({ ...prev, projectId }));
+    setShowOnboarding(false);
   };
 
   return (
@@ -66,21 +94,80 @@ const Scan = () => {
 
           <div>
             <label htmlFor="projectId" className="block text-sm font-medium text-gray-700">
-              GCP Project ID
+              GCP Project
             </label>
-            <input
-              type="text"
-              name="projectId"
-              id="projectId"
-              value={formData.projectId}
-              onChange={handleInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              placeholder="my-gcp-project-id"
-              required
-            />
-            <p className="mt-2 text-sm text-gray-500">
-              Enter the ID of the GCP project you want to scan for compliance violations.
-            </p>
+            
+            {loadingProjects ? (
+              <div className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
+                  Loading connected projects...
+                </div>
+              </div>
+            ) : connectedProjects.length > 0 ? (
+              <>
+                <div className="mt-1 flex rounded-md shadow-sm">
+                  <select
+                    name="projectId"
+                    id="projectId"
+                    value={formData.projectId}
+                    onChange={handleInputChange}
+                    className="flex-1 block w-full border border-gray-300 rounded-l-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  >
+                    <option value="">Select a connected project</option>
+                    {connectedProjects.map((project) => (
+                      <option key={project.project_id} value={project.project_id}>
+                        {project.project_id} 
+                        {project.status === 'active' ? ' ✓' : ' ⚠️'}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowOnboarding(true)}
+                    className="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    title="Connect new project"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  Select a connected GCP project to scan for compliance violations. 
+                  ✓ indicates an active connection.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50">
+                  <span className="text-gray-500">No connected projects</span>
+                </div>
+                <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                  <div className="flex">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mt-0.5 mr-2" />
+                    <div>
+                      <h3 className="text-sm font-medium text-yellow-800">
+                        Connect Your First GCP Project
+                      </h3>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        You need to connect a GCP project before you can start scanning. 
+                        Click below to get started with our guided setup.
+                      </p>
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowOnboarding(true)}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                        >
+                          <PlusIcon className="h-4 w-4 mr-2" />
+                          Connect GCP Project
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <div>
@@ -133,7 +220,7 @@ const Scan = () => {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || connectedProjects.length === 0 || !formData.projectId}
               className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -148,6 +235,13 @@ const Scan = () => {
           </div>
         </form>
       </div>
+
+      {/* GCP Onboarding Modal */}
+      <GCPOnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onComplete={handleOnboardingComplete}
+      />
     </div>
   );
 };
