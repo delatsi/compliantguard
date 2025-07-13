@@ -177,46 +177,101 @@ jobs:
       run: |
         sam build --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml
     
-    - name: Handle problematic stacks
+    - name: Handle backend stack deployment strategy
       run: |
         BASE_STACK_NAME="themisguard-api-${{ env.SAM_CONFIG_ENV }}"
         STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$BASE_STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
         
-        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" || "$STACK_STATUS" == "ROLLBACK_FAILED" || "$STACK_STATUS" == "DELETE_FAILED" ]]; then
-          echo "🚨 Stack $BASE_STACK_NAME is in $STACK_STATUS state"
-          echo "💡 Using timestamped stack name to avoid conflicts..."
-          
-          # Create new stack name with timestamp
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          NEW_STACK_NAME="${BASE_STACK_NAME}-${TIMESTAMP}"
-          
-          echo "📝 New stack name: $NEW_STACK_NAME"
-          echo "STACK_NAME=$NEW_STACK_NAME" >> $GITHUB_ENV
-          
-          # Note: Old failed stack will remain for manual cleanup
-          echo "⚠️ Old stack $BASE_STACK_NAME left for manual cleanup"
-          
-        elif [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
-          echo "📝 Stack does not exist, using standard name"
+        echo "📊 Current stack status: $STACK_STATUS"
+        
+        if [[ "$STACK_STATUS" == "DOES_NOT_EXIST" ]]; then
+          echo "📝 Stack does not exist, will create new stack"
           echo "STACK_NAME=$BASE_STACK_NAME" >> $GITHUB_ENV
+          echo "DEPLOYMENT_MODE=create" >> $GITHUB_ENV
+          
+        elif [[ "$STACK_STATUS" == "CREATE_COMPLETE" || "$STACK_STATUS" == "UPDATE_COMPLETE" || "$STACK_STATUS" == "UPDATE_ROLLBACK_COMPLETE" ]]; then
+          echo "✅ Stack is in good state, will attempt update"
+          echo "STACK_NAME=$BASE_STACK_NAME" >> $GITHUB_ENV
+          echo "DEPLOYMENT_MODE=update" >> $GITHUB_ENV
+          
+        elif [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" || "$STACK_STATUS" == "ROLLBACK_FAILED" || "$STACK_STATUS" == "DELETE_FAILED" ]]; then
+          echo "🚨 Stack $BASE_STACK_NAME is in failed state: $STACK_STATUS"
+          echo "💡 Will try to update first, then create timestamped stack if that fails"
+          echo "STACK_NAME=$BASE_STACK_NAME" >> $GITHUB_ENV
+          echo "DEPLOYMENT_MODE=update_or_create_new" >> $GITHUB_ENV
+          
         else
-          echo "📊 Stack status: $STACK_STATUS - using standard name"
+          echo "⚠️ Stack in unknown state: $STACK_STATUS, will attempt update"
           echo "STACK_NAME=$BASE_STACK_NAME" >> $GITHUB_ENV
+          echo "DEPLOYMENT_MODE=update" >> $GITHUB_ENV
         fi
     
     - name: Deploy to AWS
       run: |
-        sam deploy \
-          --config-env ${{ env.SAM_CONFIG_ENV }} \
-          --template template.yaml \
-          --stack-name ${{ env.STACK_NAME }} \
-          --resolve-s3 \
-          --no-confirm-changeset \
-          --no-fail-on-empty-changeset \
-          --parameter-overrides \
-            Environment=dev \
-            Version=${{ github.sha }} \
-            Branch=${{ github.ref_name }}
+        BASE_STACK_NAME="themisguard-api-${{ env.SAM_CONFIG_ENV }}"
+        
+        if [[ "${{ env.DEPLOYMENT_MODE }}" == "update" ]]; then
+          echo "🔄 Attempting to update existing stack: ${{ env.STACK_NAME }}"
+          sam deploy \
+            --config-env ${{ env.SAM_CONFIG_ENV }} \
+            --template template.yaml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --resolve-s3 \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Environment=dev \
+              Version=${{ github.sha }} \
+              Branch=${{ github.ref_name }}
+              
+        elif [[ "${{ env.DEPLOYMENT_MODE }}" == "update_or_create_new" ]]; then
+          echo "🔄 Attempting to update failed stack: ${{ env.STACK_NAME }}"
+          if sam deploy \
+            --config-env ${{ env.SAM_CONFIG_ENV }} \
+            --template template.yaml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --resolve-s3 \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Environment=dev \
+              Version=${{ github.sha }} \
+              Branch=${{ github.ref_name }}; then
+            echo "✅ Update succeeded!"
+          else
+            echo "❌ Update failed, creating new timestamped stack..."
+            TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+            NEW_STACK_NAME="${BASE_STACK_NAME}-${TIMESTAMP}"
+            echo "📝 Creating new stack: $NEW_STACK_NAME"
+            echo "STACK_NAME=$NEW_STACK_NAME" >> $GITHUB_ENV
+            
+            sam deploy \
+              --config-env ${{ env.SAM_CONFIG_ENV }} \
+              --template template.yaml \
+              --stack-name "$NEW_STACK_NAME" \
+              --resolve-s3 \
+              --no-confirm-changeset \
+              --no-fail-on-empty-changeset \
+              --parameter-overrides \
+                Environment=dev \
+                Version=${{ github.sha }} \
+                Branch=${{ github.ref_name }}
+          fi
+          
+        else
+          echo "🆕 Creating new stack: ${{ env.STACK_NAME }}"
+          sam deploy \
+            --config-env ${{ env.SAM_CONFIG_ENV }} \
+            --template template.yaml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --resolve-s3 \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Environment=dev \
+              Version=${{ github.sha }} \
+              Branch=${{ github.ref_name }}
+        fi
     
     - name: Get API Gateway URL
       id: get-url
