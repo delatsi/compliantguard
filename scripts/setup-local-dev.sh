@@ -2,10 +2,9 @@
 
 echo "🚀 Setting up CompliantGuard local development environment..."
 
-# Create DynamoDB table locally (if using DynamoDB Local) or use AWS
-echo "1. Setting up DynamoDB table: themisguard-users"
+echo "1. Setting up DynamoDB tables"
 
-# Check if table exists
+# Users table
 if aws dynamodb describe-table --table-name themisguard-users 2>/dev/null; then
     echo "✅ DynamoDB table 'themisguard-users' already exists"
 else
@@ -19,9 +18,51 @@ else
         --billing-mode PAY_PER_REQUEST \
         --tags Key=Environment,Value=development Key=Project,Value=CompliantGuard
     
-    echo "⏳ Waiting for table to be active..."
+    echo "⏳ Waiting for users table to be active..."
     aws dynamodb wait table-exists --table-name themisguard-users
-    echo "✅ Table created successfully"
+    echo "✅ Users table created successfully"
+fi
+
+# GCP credentials table
+if aws dynamodb describe-table --table-name compliantguard-gcp-credentials 2>/dev/null; then
+    echo "✅ DynamoDB table 'compliantguard-gcp-credentials' already exists"
+else
+    echo "📦 Creating DynamoDB table: compliantguard-gcp-credentials"
+    aws dynamodb create-table \
+        --table-name compliantguard-gcp-credentials \
+        --attribute-definitions \
+            AttributeName=user_id,AttributeType=S \
+            AttributeName=project_id,AttributeType=S \
+        --key-schema \
+            AttributeName=user_id,KeyType=HASH \
+            AttributeName=project_id,KeyType=RANGE \
+        --billing-mode PAY_PER_REQUEST \
+        --tags Key=Environment,Value=development Key=Project,Value=CompliantGuard
+    
+    echo "⏳ Waiting for GCP credentials table to be active..."
+    aws dynamodb wait table-exists --table-name compliantguard-gcp-credentials
+    echo "✅ GCP credentials table created successfully"
+fi
+
+# Create KMS key for local development
+echo "🔐 Setting up KMS key for credential encryption..."
+if aws kms describe-key --key-id alias/compliantguard-gcp-credentials 2>/dev/null; then
+    echo "✅ KMS key already exists"
+else
+    echo "📦 Creating KMS key for development..."
+    KEY_ID=$(aws kms create-key \
+        --description "CompliantGuard GCP Credentials (Development)" \
+        --key-usage ENCRYPT_DECRYPT \
+        --key-spec SYMMETRIC_DEFAULT \
+        --tags TagKey=Environment,TagValue=development TagKey=Project,TagValue=CompliantGuard \
+        --query 'KeyMetadata.KeyId' \
+        --output text)
+    
+    aws kms create-alias \
+        --alias-name alias/compliantguard-gcp-credentials \
+        --target-key-id "$KEY_ID"
+    
+    echo "✅ KMS key created for development"
 fi
 
 echo ""

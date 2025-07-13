@@ -12,6 +12,7 @@ from botocore.exceptions import ClientError
 from .core.config import settings
 from .core.auth import verify_token, get_current_user
 from .routes.auth import router as auth_router
+from .routes.gcp import router as gcp_router
 from .models.compliance import ComplianceReport, ViolationSummary
 from .models.admin import AdminDashboardData
 from .models.subscription import (
@@ -31,6 +32,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
+app.include_router(gcp_router, prefix="/api/v1/gcp", tags=["gcp"])
 
 # CORS middleware
 app.add_middleware(
