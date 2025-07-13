@@ -314,6 +314,10 @@ jobs:
       run: |
         FRONTEND_STACK_NAME="compliantguard-frontend-${{ env.SAM_CONFIG_ENV }}"
         
+        echo "🔍 Checking frontend infrastructure deployment..."
+        echo "Stack name: $FRONTEND_STACK_NAME"
+        echo "Environment: ${{ env.SAM_CONFIG_ENV }}"
+        
         # Check if frontend stack exists
         STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$FRONTEND_STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
         
@@ -341,6 +345,10 @@ jobs:
           
           echo "⏳ Waiting for frontend infrastructure stack creation..."
           aws cloudformation wait stack-create-complete --stack-name "$FRONTEND_STACK_NAME"
+          
+          # Debug: Show what was created
+          echo "📋 Stack creation completed. Resources created:"
+          aws cloudformation list-stack-resources --stack-name "$FRONTEND_STACK_NAME" --query 'StackResourceSummaries[].{Type:ResourceType,Status:ResourceStatus,LogicalId:LogicalResourceId}' --output table
         else
           echo "📦 Frontend infrastructure stack exists with status: $STACK_STATUS"
           if [[ "$STACK_STATUS" == "UPDATE_ROLLBACK_COMPLETE" || "$STACK_STATUS" == "CREATE_FAILED" ]]; then

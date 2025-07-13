@@ -1,10 +1,10 @@
 # Custom Domain Setup for CompliantGuard
 
-This guide walks through setting up `compliantguard.delatsi.com` as the custom domain for the frontend.
+This guide walks through setting up `compliantguard.datfunc.com` as the custom domain for the frontend.
 
 ## Prerequisites
 
-- Access to delatsi.com DNS management (Route 53 or your DNS provider)
+- Access to datfunc.com DNS management (Route 53 or your DNS provider)
 - AWS CLI configured with appropriate permissions
 - GitHub repository with secrets access
 
@@ -18,7 +18,7 @@ chmod +x setup-ssl-cert.sh
 ```
 
 This will:
-1. Request an SSL certificate for `compliantguard.delatsi.com` in us-east-1
+1. Request an SSL certificate for `compliantguard.datfunc.com` in us-east-1
 2. Return a Certificate ARN
 3. Provide DNS validation records
 
@@ -29,8 +29,8 @@ This will:
 aws acm describe-certificate --certificate-arn <CERT_ARN> --region us-east-1 --query 'Certificate.DomainValidationOptions[0]'
 ```
 
-2. Add the CNAME record to your delatsi.com DNS zone:
-   - **Name**: `_xxxxxxxxxxxx.compliantguard.delatsi.com`
+2. Add the CNAME record to your datfunc.com DNS zone:
+   - **Name**: `_xxxxxxxxxxxx.compliantguard.datfunc.com`
    - **Value**: `_yyyyyyyyyyyy.acm-validations.aws.`
    - **Type**: CNAME
 
@@ -45,7 +45,7 @@ Add these secrets to your GitHub repository:
 
 1. Go to: Settings → Secrets and variables → Actions
 2. Add repository secrets:
-   - **CUSTOM_DOMAIN_NAME**: `compliantguard.delatsi.com`
+   - **CUSTOM_DOMAIN_NAME**: `compliantguard.datfunc.com`
    - **SSL_CERT_ARN**: `arn:aws:acm:us-east-1:xxxxxxxxxxxx:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 
 ## Step 4: Deploy with Custom Domain
@@ -67,14 +67,14 @@ aws cloudformation describe-stacks \
 ```
 
 Then add a CNAME record to your DNS:
-- **Name**: `compliantguard.delatsi.com`
+- **Name**: `compliantguard.datfunc.com`
 - **Value**: `dxxxxxxxxxxxxx.cloudfront.net` (from above command)
 - **Type**: CNAME
 
 ## Verification
 
 After DNS propagation (5-15 minutes), your site should be accessible at:
-- ✅ `https://compliantguard.delatsi.com`
+- ✅ `https://compliantguard.datfunc.com`
 - 🔒 SSL certificate should be valid
 - 🚀 Served via CloudFront CDN
 
@@ -82,12 +82,12 @@ After DNS propagation (5-15 minutes), your site should be accessible at:
 
 ### Certificate Validation Stuck
 - Verify DNS record was added correctly
-- Check DNS propagation: `dig TXT _validation.compliantguard.delatsi.com`
+- Check DNS propagation: `dig TXT _validation.compliantguard.datfunc.com`
 - Certificate validation can take up to 72 hours but usually completes in 30 minutes
 
 ### DNS Not Resolving
 - Check CNAME record points to CloudFront distribution
-- Verify DNS propagation: `dig compliantguard.delatsi.com`
+- Verify DNS propagation: `dig compliantguard.datfunc.com`
 - Clear browser cache and try incognito mode
 
 ### SSL Certificate Errors
