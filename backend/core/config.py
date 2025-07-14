@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     GCP_PROJECT_ID: Optional[str] = os.getenv("GCP_PROJECT_ID")
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     
+    # GCP Credential Storage
+    KMS_KEY_ALIAS: str = os.getenv("KMS_KEY_ALIAS", "alias/compliantguard-gcp-credentials")
+    GCP_CREDENTIALS_TABLE: str = os.getenv("GCP_CREDENTIALS_TABLE", "compliantguard-gcp-credentials")
+    
     # Stripe Configuration
     STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "sk_test_...")
     STRIPE_PUBLISHABLE_KEY: str = os.getenv("STRIPE_PUBLISHABLE_KEY", "pk_test_...")
