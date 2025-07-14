@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Security, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, Security, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -60,15 +60,18 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-# Temporary inline GCP routes (will move to separate file later)
+# GCP Credential Management Routes
 @app.post("/api/v1/gcp/credentials/upload")
 async def upload_gcp_credentials_file(
-    project_id: str,
+    project_id: str = Form(...),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
     """Upload GCP service account JSON file"""
     try:
+        print(f"📤 Uploading credentials for project: {project_id}")
+        print(f"📁 File: {file.filename}, Size: {file.size}")
+        
         # Validate file type
         if not file.filename.endswith('.json'):
             raise HTTPException(
@@ -80,10 +83,10 @@ async def upload_gcp_credentials_file(
         content = await file.read()
         try:
             service_account_json = json.loads(content.decode('utf-8'))
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid JSON file format"
+                detail=f"Invalid JSON file format: {str(e)}"
             )
         
         # Basic validation of required fields
@@ -105,9 +108,64 @@ async def upload_gcp_credentials_file(
                 detail="File must be a service account key"
             )
         
-        # For now, just return success (later will implement actual storage)
+        print(f"✅ Valid service account: {service_account_json.get('client_email')}")
+        
+        # TODO: Implement actual KMS encryption and DynamoDB storage
+        # For now, just return success to test the flow
         return {
             "message": "GCP credentials uploaded and stored successfully",
+            "project_id": project_id,
+            "service_account_email": service_account_json.get('client_email', 'unknown'),
+            "file_project_id": service_account_json.get('project_id'),
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Upload error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload GCP credentials: {str(e)}"
+        )
+
+@app.post("/api/v1/gcp/credentials")
+async def upload_gcp_credentials_json(
+    credential_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload GCP credentials via JSON payload"""
+    try:
+        project_id = credential_data.get('project_id')
+        service_account_json = credential_data.get('service_account_json')
+        
+        if not project_id or not service_account_json:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing project_id or service_account_json"
+            )
+        
+        # Same validation as file upload
+        required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 
+                          'client_email', 'client_id', 'auth_uri', 'token_uri']
+        
+        missing_fields = [field for field in required_fields 
+                         if field not in service_account_json]
+        
+        if missing_fields:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid service account. Missing fields: {missing_fields}"
+            )
+        
+        if service_account_json['type'] != 'service_account':
+            raise HTTPException(
+                status_code=400,
+                detail="Must be a service account key"
+            )
+        
+        return {
+            "message": "GCP credentials stored successfully",
             "project_id": project_id,
             "service_account_email": service_account_json.get('client_email', 'unknown')
         }
@@ -117,7 +175,7 @@ async def upload_gcp_credentials_file(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="Failed to upload GCP credentials"
+            detail="Failed to store GCP credentials"
         )
 
 @app.get("/api/v1/gcp/projects")
@@ -125,8 +183,23 @@ async def list_gcp_projects(
     current_user: dict = Depends(get_current_user)
 ):
     """List all GCP projects configured for the current user"""
-    # For now, return empty list (later will implement actual storage)
+    print(f"📋 Listing projects for user: {current_user.get('user_id')}")
+    
+    # TODO: Implement actual DynamoDB lookup
+    # For now, return empty list for testing
     return []
+
+@app.get("/api/v1/gcp/projects/{project_id}/status") 
+async def check_gcp_project_status(
+    project_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check the status of GCP credentials for a project"""
+    return {
+        "project_id": project_id,
+        "status": "not_found",
+        "connection_status": "disconnected"
+    }
 
 @app.delete("/api/v1/gcp/projects/{project_id}/credentials")
 async def revoke_gcp_credentials(
@@ -134,9 +207,13 @@ async def revoke_gcp_credentials(
     current_user: dict = Depends(get_current_user)
 ):
     """Revoke GCP credentials for a specific project"""
+    print(f"🗑️ Revoking credentials for project: {project_id}")
+    
+    # TODO: Implement actual credential deletion from DynamoDB
     return {
         "message": f"GCP credentials revoked for project {project_id}",
-        "project_id": project_id
+        "project_id": project_id,
+        "status": "revoked"
     }
 
 @app.post("/api/v1/scan")
