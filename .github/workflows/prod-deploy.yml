@@ -268,16 +268,21 @@ jobs:
           echo "📊 Stack status: $STACK_STATUS"
         fi
     
-    - name: Deploy to production
+    - name: Deploy to production (stable stack name)
       run: |
+        STACK_NAME="themisguard-api-prod"
+        echo "🚀 Deploying to production with stable stack name: $STACK_NAME"
+        
         sam deploy \
           --config-env ${{ env.SAM_CONFIG_ENV }} \
           --template template.yaml \
+          --stack-name "$STACK_NAME" \
           --resolve-s3 \
           --no-confirm-changeset \
           --no-fail-on-empty-changeset \
           --parameter-overrides \
             Environment=prod \
+            ProjectName=themisguard \
             Version=${{ needs.validate-deployment-request.outputs.version }} \
             Branch=${{ github.ref_name }}
     
@@ -286,8 +291,12 @@ jobs:
         echo "🔍 Verifying API deployment..."
         sleep 60  # Allow time for deployment to stabilize
         
-        # Get API URL
-        API_URL=$(sam list stack-outputs --config-env ${{ env.SAM_CONFIG_ENV }} --template template.yaml --output json | jq -r '.[] | select(.OutputKey=="ApiUrl") | .OutputValue' || echo "")
+        # Get API URL from stable stack
+        STACK_NAME="themisguard-api-prod"
+        API_URL=$(aws cloudformation describe-stacks \
+          --stack-name "$STACK_NAME" \
+          --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
+          --output text 2>/dev/null || echo "")
         
         if [[ -n "$API_URL" ]]; then
           echo "API URL: $API_URL"

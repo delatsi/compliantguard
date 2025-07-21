@@ -22,8 +22,11 @@ class GCPCredentialService:
     def __init__(self):
         self.kms_client = boto3.client('kms', region_name=settings.AWS_REGION)
         self.dynamodb = boto3.resource('dynamodb', region_name=settings.AWS_REGION)
-        self.creds_table = self.dynamodb.Table('compliantguard-gcp-credentials')
-        self.kms_key_alias = 'alias/compliantguard-gcp-credentials'
+        # Use GCP_CREDENTIALS_TABLE if available, otherwise derive from main table name
+        gcp_table_name = getattr(settings, 'GCP_CREDENTIALS_TABLE', 
+                                settings.DYNAMODB_TABLE_NAME.replace('-scans', '-gcp-credentials'))
+        self.creds_table = self.dynamodb.Table(gcp_table_name)
+        self.kms_key_alias = getattr(settings, 'KMS_KEY_ALIAS', 'alias/compliantguard-gcp-credentials')
     
     async def store_credentials(self, user_id: str, project_id: str, 
                               service_account_json: Dict) -> Dict:

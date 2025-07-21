@@ -10,8 +10,10 @@ Globals:
     Environment:
       Variables:
         ENVIRONMENT: !Ref Environment
-        DYNAMODB_TABLE_NAME: !Sub "${AWS::StackName}-scans"
-        S3_BUCKET_NAME: !Sub "${AWS::StackName}-reports"
+        DYNAMODB_TABLE_NAME: !Sub "${ProjectName}-${Environment}-scans"
+        S3_BUCKET_NAME: !Sub "${ProjectName}-${Environment}-reports"
+        GCP_CREDENTIALS_TABLE: !Sub "${ProjectName}-${Environment}-gcp-credentials"
+        KMS_KEY_ALIAS: "alias/compliantguard-gcp-credentials"
         JWT_SECRET_KEY: !Ref JWTSecretKey
         GCP_PROJECT_ID: !Ref GCPProjectId
         GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
@@ -90,7 +92,7 @@ Resources:
   ThemisGuardAPI:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub "${AWS::StackName}-api"
+      FunctionName: !Sub "${ProjectName}-${Environment}-api"
       CodeUri: backend/
       Handler: main.handler
       Events:
@@ -125,6 +127,8 @@ Resources:
             TableName: !Ref InvoicesTable
         - DynamoDBCrudPolicy:
             TableName: !Ref WebhookEventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GCPCredentialsTable
         - S3CrudPolicy:
             BucketName: !Ref ReportsBucket
         - Version: '2012-10-17'
@@ -143,12 +147,30 @@ Resources:
                 - !Sub "${UsageTable.Arn}/index/*"
                 - !Sub "${InvoicesTable.Arn}/index/*"
                 - !Sub "${WebhookEventsTable.Arn}/index/*"
+                - !Sub "${GCPCredentialsTable.Arn}/index/*"
+            - Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:ReEncrypt*
+                - kms:GenerateDataKey*
+                - kms:DescribeKey
+              Resource: 
+                - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/compliantguard-gcp-credentials"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        Component: api
+        Tier: !If [IsProduction, "production", "development"]
+        Owner: DevOps
+        CostCenter: Engineering
+        Application: !Ref ProjectName
 
   # DynamoDB Tables
   ScansTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-scans"
+      TableName: !Sub "${ProjectName}-${Environment}-scans"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: scan_id
@@ -173,11 +195,28 @@ Resources:
         StreamViewType: NEW_AND_OLD_IMAGES
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: core
+        - Key: Tier
+          Value: !If [IsProduction, "production", "development"]
+        - Key: Owner
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+        - Key: Application
+          Value: !Ref ProjectName
+        - Key: DataClassification
+          Value: compliance-data
 
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-users"
+      TableName: !Sub "${ProjectName}-${Environment}-users"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: user_id
@@ -196,12 +235,29 @@ Resources:
             ProjectionType: ALL
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: auth
+        - Key: Tier
+          Value: !If [IsProduction, "production", "development"]
+        - Key: Owner
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+        - Key: Application
+          Value: !Ref ProjectName
+        - Key: DataClassification
+          Value: user-data
 
   # Admin DynamoDB Tables (segregated from customer data)
   AdminUsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-admin-users"
+      TableName: !Sub "${ProjectName}-${Environment}-admin-users"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: admin_id
@@ -223,11 +279,28 @@ Resources:
       DeletionProtectionEnabled: true
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: admin
+        - Key: Tier
+          Value: !If [IsProduction, "production", "development"]
+        - Key: Owner
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+        - Key: Application
+          Value: !Ref ProjectName
+        - Key: DataClassification
+          Value: admin-data
 
   AdminSessionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-admin-sessions"
+      TableName: !Sub "${ProjectName}-${Environment}-admin-sessions"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: session_id
@@ -253,7 +326,7 @@ Resources:
   AdminAuditTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-admin-audit"
+      TableName: !Sub "${ProjectName}-${Environment}-admin-audit"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: log_id
@@ -283,7 +356,7 @@ Resources:
   AdminMetricsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-admin-metrics"
+      TableName: !Sub "${ProjectName}-${Environment}-admin-metrics"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: metric_type
@@ -301,7 +374,7 @@ Resources:
   SubscriptionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-subscriptions"
+      TableName: !Sub "${ProjectName}-${Environment}-subscriptions"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: subscription_id
@@ -344,7 +417,7 @@ Resources:
   UsageTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-usage"
+      TableName: !Sub "${ProjectName}-${Environment}-usage"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: usage_id
@@ -383,7 +456,7 @@ Resources:
   InvoicesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-invoices"
+      TableName: !Sub "${ProjectName}-${Environment}-invoices"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: invoice_id
@@ -424,7 +497,7 @@ Resources:
   WebhookEventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${AWS::StackName}-webhook-events"
+      TableName: !Sub "${ProjectName}-${Environment}-webhook-events"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: event_id
@@ -464,11 +537,53 @@ Resources:
         - Key: DataClassification
           Value: operational
 
+  # GCP Credentials Table (for encrypted credential storage)
+  GCPCredentialsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-gcp-credentials"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: project_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: project_id
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        KMSMasterKeyId: !Ref GCPCredentialsKMSKey
+      DeletionProtectionEnabled: !If [IsProduction, true, false]
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: security
+        - Key: Tier
+          Value: !If [IsProduction, "production", "development"]
+        - Key: Owner
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+        - Key: Application
+          Value: !Ref ProjectName
+        - Key: DataClassification
+          Value: encrypted-credentials
+
   # S3 Bucket for reports with enhanced security
   ReportsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "${AWS::StackName}-reports-${AWS::AccountId}"
+      BucketName: !Sub "${ProjectName}-${Environment}-reports-${AWS::AccountId}"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -499,8 +614,16 @@ Resources:
           Value: !Ref Environment
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Component
+          Value: storage
+        - Key: Tier
+          Value: !If [IsProduction, "production", "development"]
         - Key: Owner
-          Value: delatsi-llc
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+        - Key: Application
+          Value: !Ref ProjectName
         - Key: DataClassification
           Value: confidential
         - Key: BackupRequired
@@ -511,7 +634,7 @@ Resources:
   CognitoUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub "${AWS::StackName}-users"
+      UserPoolName: !Sub "${ProjectName}-${Environment}-users"
       AutoVerifiedAttributes:
         - email
       UsernameAttributes:
@@ -545,15 +668,18 @@ Resources:
       UserPoolTags:
         Environment: !Ref Environment
         Project: !Ref ProjectName
-        Application: ThemisGuard
-        Owner: delatsi-llc
+        Component: auth
+        Tier: !If [IsProduction, "production", "development"]
+        Owner: DevOps
+        CostCenter: Engineering
+        Application: !Ref ProjectName
         DataClassification: sensitive
 
   # Cognito User Pool Client
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: !Sub "${AWS::StackName}-client"
+      ClientName: !Sub "${ProjectName}-${Environment}-client"
       UserPoolId: !Ref CognitoUserPool
       GenerateSecret: false
       SupportedIdentityProviders: !If
@@ -561,10 +687,10 @@ Resources:
         - [COGNITO, Google]
         - [COGNITO]
       CallbackURLs:
-        - !Sub "https://${AWS::StackName}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse"
+        - !Sub "https://${ProjectName}-${Environment}-auth.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse"
         - "http://localhost:5173/auth/callback"
       LogoutURLs:
-        - !Sub "https://${AWS::StackName}.auth.${AWS::Region}.amazoncognito.com/logout"
+        - !Sub "https://${ProjectName}-${Environment}-auth.auth.${AWS::Region}.amazoncognito.com/logout"
         - "http://localhost:5173/"
       AllowedOAuthFlows:
         - code
@@ -600,7 +726,7 @@ Resources:
   CognitoUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
-      Domain: !Sub "${AWS::StackName}-auth"
+      Domain: !Sub "${ProjectName}-${Environment}-auth"
       UserPoolId: !Ref CognitoUserPool
 
   # API Gateway Custom Domain (optional)
@@ -610,6 +736,47 @@ Resources:
     Properties:
       DomainName: !Ref CustomDomainName
       CertificateArn: !Ref SSLCertificateArn
+
+  # KMS Key for GCP Credentials Encryption
+  GCPCredentialsKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "KMS key for encrypting GCP service account credentials"
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: Allow Lambda Function Access
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: "*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: encryption
+        - Key: Purpose
+          Value: gcp-credentials
+
+  GCPCredentialsKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/compliantguard-gcp-credentials
+      TargetKeyId: !Ref GCPCredentialsKMSKey
 
 Conditions:
   HasCustomDomain: !Not [!Equals [!Ref CustomDomainName, ""]]

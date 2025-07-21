@@ -1,10 +1,12 @@
-name: Deploy to Development
+name: Deploy to Development (Legacy)
 
 on:
-  push:
-    branches: [ develop, main ]
-  pull_request:
-    branches: [ develop ]
+  workflow_dispatch:
+    inputs:
+      use_legacy:
+        description: 'Use legacy deployment (for emergency only)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read

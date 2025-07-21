@@ -1,0 +1,523 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CompliantGuard Cost Management and Monitoring Infrastructure'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: CompliantGuard
+    Description: Name of the project
+  
+  Environment:
+    Type: String
+    Default: shared
+    AllowedValues: [dev, staging, prod, shared]
+    Description: Environment for cost management resources
+  
+  AlertEmail:
+    Type: String
+    Description: Email address for cost alerts
+    Default: alerts@yourcompany.com
+  
+  DevBudgetLimit:
+    Type: Number
+    Default: 50
+    Description: Monthly budget limit for development environment (USD)
+  
+  StagingBudgetLimit:
+    Type: Number
+    Default: 100
+    Description: Monthly budget limit for staging environment (USD)
+    
+  ProdBudgetLimit:
+    Type: Number
+    Default: 200
+    Description: Monthly budget limit for production environment (USD)
+
+Resources:
+  # SNS Topic for Cost Alerts
+  CostAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-cost-alerts"
+      DisplayName: !Sub "${ProjectName} Cost Alerts"
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: monitoring
+        - Key: Tier
+          Value: shared
+        - Key: Owner
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+
+  # SNS Subscription for Email Alerts
+  CostAlertsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref CostAlertsTopic
+      Endpoint: !Ref AlertEmail
+
+  # CloudWatch Dashboard for Cost Monitoring
+  CostDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "${ProjectName}-Cost-Dashboard"
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/Billing", "EstimatedCharges", "Currency", "USD" ]
+                ],
+                "period": 86400,
+                "stat": "Maximum",
+                "region": "us-east-1",
+                "title": "Total AWS Costs (Monthly)",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                },
+                "annotations": {
+                  "horizontal": [
+                    {
+                      "label": "Dev Budget ($${DevBudgetLimit})",
+                      "value": ${DevBudgetLimit}
+                    },
+                    {
+                      "label": "Total Budget ($${AWS::StackName})",
+                      "value": 350
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "view": "timeSeries",
+                "stacked": true,
+                "metrics": [
+                  [ "AWS/Lambda", "Duration", { "stat": "Sum" } ],
+                  [ ".", "Invocations", { "stat": "Sum" } ],
+                  [ ".", "Errors", { "stat": "Sum" } ]
+                ],
+                "period": 3600,
+                "stat": "Average",
+                "region": "us-east-1",
+                "title": "Lambda Usage (${ProjectName})",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "compliantguard-gcp-credentials", { "stat": "Sum" } ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", ".", { "stat": "Sum" } ]
+                ],
+                "period": 3600,
+                "stat": "Average",
+                "region": "us-east-1",
+                "title": "DynamoDB Usage (Credentials)",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 8,
+              "y": 6,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "${ProjectName}" ],
+                  [ ".", "Latency", ".", ".", { "stat": "Average" } ],
+                  [ ".", "4XXError", ".", ".", { "stat": "Sum" } ],
+                  [ ".", "5XXError", ".", ".", { "stat": "Sum" } ]
+                ],
+                "period": 3600,
+                "stat": "Sum",
+                "region": "us-east-1",
+                "title": "API Gateway Usage",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 16,
+              "y": 6,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/S3", "BucketSizeBytes", "BucketName", "compliantguard-frontend-dev", "StorageType", "StandardStorage" ]
+                ],
+                "period": 86400,
+                "stat": "Average",
+                "region": "us-east-1",
+                "title": "S3 Storage Usage",
+                "yAxis": {
+                  "left": {
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 12,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "view": "number",
+                "metrics": [
+                  [ "AWS/DynamoDB", "ItemCount", "TableName", "compliantguard-gcp-credentials" ]
+                ],
+                "period": 86400,
+                "stat": "Maximum",
+                "region": "us-east-1",
+                "title": "Active Resources Count"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 12,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/KMS", "NumberOfRequestsSucceeded", "KeyId", "alias/compliantguard-gcp-credentials" ]
+                ],
+                "period": 3600,
+                "stat": "Sum",
+                "region": "us-east-1",
+                "title": "KMS Key Usage (Security)"
+              }
+            }
+          ]
+        }
+
+  # Cost Anomaly Detector
+  CostAnomalyDetector:
+    Type: AWS::CE::AnomalyDetector
+    Properties:
+      AnomalyDetectorName: !Sub "${ProjectName}-Cost-Anomaly-Detector"
+      MonitorType: DIMENSIONAL
+      MonitorSpecification:
+        DimensionKey: SERVICE
+        MatchOptions:
+          - EQUALS
+        Values:
+          - Amazon Simple Storage Service
+          - Amazon DynamoDB
+          - AWS Lambda
+          - Amazon API Gateway
+          - AWS Key Management Service
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: monitoring
+        - Key: Owner
+          Value: DevOps
+
+  # Cost Anomaly Subscription
+  CostAnomalySubscription:
+    Type: AWS::CE::AnomalySubscription
+    Properties:
+      SubscriptionName: !Sub "${ProjectName}-Cost-Anomaly-Alerts"
+      Frequency: DAILY
+      MonitorArnList:
+        - !Ref CostAnomalyDetector
+      Subscribers:
+        - Type: EMAIL
+          Address: !Ref AlertEmail
+      ThresholdExpression: !Sub |
+        {
+          "And": [
+            {
+              "Dimensions": {
+                "Key": "ANOMALY_TOTAL_IMPACT_ABSOLUTE",
+                "Values": ["10"],
+                "MatchOptions": ["GREATER_THAN_OR_EQUAL"]
+              }
+            }
+          ]
+        }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment  
+          Value: !Ref Environment
+        - Key: Component
+          Value: monitoring
+
+  # CloudWatch Alarms for High Costs
+  HighCostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-High-Daily-Cost"
+      AlarmDescription: "Alert when daily AWS costs exceed threshold"
+      MetricName: EstimatedCharges
+      Namespace: AWS/Billing
+      Statistic: Maximum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: !Ref ProdBudgetLimit
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: Currency
+          Value: USD
+      AlarmActions:
+        - !Ref CostAlertsTopic
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: monitoring
+
+  # IAM Role for Cost Management Lambda
+  CostManagementRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-CostManagement-Role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CostManagementPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ce:GetCostAndUsage
+                  - ce:GetUsageReport
+                  - ce:ListCostCategoryDefinitions
+                  - ce:GetRightsizingRecommendation
+                  - budgets:ViewBudget
+                  - budgets:DescribeBudgets
+                  - cloudwatch:PutMetricData
+                  - sns:Publish
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - tag:GetResources
+                  - tag:TagResources
+                  - tag:UntagResources
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: iam
+
+  # Lambda Function for Cost Reporting
+  CostReportingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-cost-reporting"
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt CostManagementRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import datetime
+          from decimal import Decimal
+          
+          def lambda_handler(event, context):
+              ce = boto3.client('ce')
+              sns = boto3.client('sns')
+              cloudwatch = boto3.client('cloudwatch')
+              
+              # Get cost data for the current month
+              end_date = datetime.date.today()
+              start_date = end_date.replace(day=1)
+              
+              try:
+                  response = ce.get_cost_and_usage(
+                      TimePeriod={
+                          'Start': start_date.strftime('%Y-%m-%d'),
+                          'End': end_date.strftime('%Y-%m-%d')
+                      },
+                      Granularity='MONTHLY',
+                      Metrics=['BlendedCost'],
+                      GroupBy=[
+                          {
+                              'Type': 'TAG',
+                              'Key': 'Environment'
+                          }
+                      ]
+                  )
+                  
+                  # Parse costs by environment
+                  costs = {}
+                  total_cost = 0
+                  
+                  for result in response['ResultsByTime']:
+                      for group in result['Groups']:
+                          env = group['Keys'][0] if group['Keys'][0] else 'untagged'
+                          cost = float(group['Metrics']['BlendedCost']['Amount'])
+                          costs[env] = cost
+                          total_cost += cost
+                  
+                  # Send metrics to CloudWatch
+                  cloudwatch.put_metric_data(
+                      Namespace='CompliantGuard/Costs',
+                      MetricData=[
+                          {
+                              'MetricName': 'TotalMonthlyCost',
+                              'Value': total_cost,
+                              'Unit': 'None'
+                          }
+                      ]
+                  )
+                  
+                  # Generate report
+                  report = f"""
+                  CompliantGuard Cost Report - {end_date.strftime('%Y-%m')}
+                  =============================================
+                  
+                  Total Cost: ${total_cost:.2f}
+                  
+                  By Environment:
+                  """
+                  
+                  for env, cost in costs.items():
+                      report += f"  {env}: ${cost:.2f}\n"
+                  
+                  # Send alert if costs are high
+                  if total_cost > 300:  # Alert threshold
+                      sns.publish(
+                          TopicArn=context.invoked_function_arn.replace(':function:', ':sns:').replace('-cost-reporting', '-cost-alerts'),
+                          Subject='High AWS Costs Alert - CompliantGuard',
+                          Message=f"Monthly costs have reached ${total_cost:.2f}, which exceeds the $300 threshold.\n\n{report}"
+                      )
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'totalCost': total_cost,
+                          'costsByEnvironment': costs,
+                          'report': report
+                      }, default=str)
+                  }
+                  
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({'error': str(e)})
+                  }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Component
+          Value: cost-reporting
+        - Key: Tier
+          Value: shared
+
+  # EventBridge Rule for Daily Cost Reports
+  DailyCostReportRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-daily-cost-report"
+      Description: "Trigger daily cost report generation"
+      ScheduleExpression: "cron(0 9 * * ? *)"  # 9 AM UTC daily
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt CostReportingFunction.Arn
+          Id: "CostReportingTarget"
+
+  # Permission for EventBridge to invoke Lambda
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CostReportingFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DailyCostReportRule.Arn
+
+Outputs:
+  DashboardURL:
+    Description: "URL to the CloudWatch Cost Dashboard"
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${ProjectName}-Cost-Dashboard"
+    Export:
+      Name: !Sub "${AWS::StackName}-DashboardURL"
+
+  SNSTopicArn:
+    Description: "ARN of the cost alerts SNS topic"
+    Value: !Ref CostAlertsTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-CostAlertsTopic"
+
+  CostReportingFunctionArn:
+    Description: "ARN of the cost reporting Lambda function"
+    Value: !GetAtt CostReportingFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-CostReportingFunction"
+
+  TaggingStrategy:
+    Description: "Recommended tagging strategy for cost allocation"
+    Value: "Project=CompliantGuard,Environment=[dev|staging|prod],Component=[frontend|api|auth|security],Tier=[development|staging|production],Owner=DevOps,CostCenter=Engineering"
