@@ -314,7 +314,8 @@ jobs:
             Environment="$ENVIRONMENT" \
             ProjectName=themisguard \
             Version="${{ github.sha }}" \
-            Branch="${{ github.ref_name }}"
+            Branch="${{ github.ref_name }}" \
+            GoogleClientId="${{ needs.detect-changes.outputs.environment == 'dev' && secrets.GOOGLE_CLIENT_ID_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.GOOGLE_CLIENT_ID_STAGING || secrets.GOOGLE_CLIENT_ID_PROD }}"
         
         echo "stack_name=$STACK_NAME" >> $GITHUB_OUTPUT
         echo "✅ Backend deployment completed successfully"
