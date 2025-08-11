@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 import os
 import json
+import sys
 from datetime import datetime
 from typing import Optional, List
 import boto3
@@ -53,11 +54,103 @@ stripe_service = StripeService()
 
 @app.get("/")
 async def root():
+    print("🏠 Root endpoint accessed")
+    print(f"🌍 Environment: {settings.ENVIRONMENT}")
+    print(f"📍 Region: {settings.AWS_REGION}")
     return {"message": "ThemisGuard HIPAA Compliance API", "version": "1.0.0"}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    print("❤️ Health check endpoint accessed")
+    print(f"🕐 Timestamp: {datetime.utcnow().isoformat()}")
+    
+    # Test AWS connectivity
+    health_details = {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": settings.ENVIRONMENT,
+        "region": settings.AWS_REGION,
+        "services": {}
+    }
+    
+    try:
+        # Test DynamoDB
+        print("🗄️ Testing DynamoDB connectivity...")
+        dynamodb = boto3.resource('dynamodb', region_name=settings.AWS_REGION)
+        test_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
+        test_table.table_status  # This will raise exception if table doesn't exist
+        health_details["services"]["dynamodb"] = "connected"
+        print(f"✅ DynamoDB table accessible: {settings.DYNAMODB_TABLE_NAME}")
+    except Exception as e:
+        print(f"❌ DynamoDB error: {str(e)}")
+        health_details["services"]["dynamodb"] = f"error: {str(e)}"
+    
+    try:
+        # Test S3
+        print("🗂️ Testing S3 connectivity...")
+        s3 = boto3.client('s3', region_name=settings.AWS_REGION)
+        s3.head_bucket(Bucket=settings.S3_BUCKET_NAME)
+        health_details["services"]["s3"] = "connected"
+        print(f"✅ S3 bucket accessible: {settings.S3_BUCKET_NAME}")
+    except Exception as e:
+        print(f"❌ S3 error: {str(e)}")
+        health_details["services"]["s3"] = f"error: {str(e)}"
+    
+    return health_details
+
+@app.get("/debug")
+async def debug_info():
+    """Debug endpoint to show environment and configuration"""
+    print("🔍 Debug endpoint accessed")
+    
+    debug_info = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": {
+            "ENVIRONMENT": settings.ENVIRONMENT,
+            "AWS_REGION": settings.AWS_REGION,
+            "DYNAMODB_TABLE_NAME": settings.DYNAMODB_TABLE_NAME,
+            "S3_BUCKET_NAME": settings.S3_BUCKET_NAME,
+        },
+        "aws_connectivity": {},
+        "tables": {},
+        "versions": {
+            "python": sys.version,
+            "boto3": boto3.__version__
+        }
+    }
+    
+    # Test each AWS service
+    try:
+        import sys
+        print("🐍 Python version:", sys.version)
+        print("📦 Boto3 version:", boto3.__version__)
+        
+        # Test DynamoDB tables
+        dynamodb = boto3.resource('dynamodb', region_name=settings.AWS_REGION)
+        
+        tables_to_check = [
+            settings.DYNAMODB_TABLE_NAME,
+            settings.DYNAMODB_TABLE_NAME.replace('-scans', '-users'),
+            settings.DYNAMODB_TABLE_NAME.replace('-scans', '-gcp-credentials')
+        ]
+        
+        for table_name in tables_to_check:
+            try:
+                table = dynamodb.Table(table_name)
+                status = table.table_status
+                debug_info["tables"][table_name] = {"status": status, "accessible": True}
+                print(f"✅ Table {table_name}: {status}")
+            except Exception as e:
+                debug_info["tables"][table_name] = {"status": "error", "error": str(e), "accessible": False}
+                print(f"❌ Table {table_name}: {str(e)}")
+        
+        debug_info["aws_connectivity"]["dynamodb"] = "ok"
+        
+    except Exception as e:
+        debug_info["aws_connectivity"]["dynamodb"] = f"error: {str(e)}"
+        print(f"❌ DynamoDB connectivity error: {str(e)}")
+    
+    return debug_info
 
 
 @app.post("/api/v1/scan")
@@ -66,36 +159,79 @@ async def trigger_compliance_scan(
     current_user: dict = Depends(get_current_user)
 ):
     """Trigger a new compliance scan for a GCP project"""
+    print(f"🔍 Compliance scan request initiated")
+    print(f"👤 User: {current_user.get('user_id')}")
+    print(f"🎯 Project ID: {project_id}")
+    print(f"🕰️ Timestamp: {datetime.utcnow().isoformat()}")
+    
     try:
         # Check usage limits before running scan
+        print(f"📈 Checking usage limits...")
         limits_check = await stripe_service.check_usage_limits(current_user["user_id"])
+        print(f"📊 Limits check result: {limits_check}")
+        
         if not limits_check.get("within_limits", True):
+            reason = limits_check.get('reason', 'Unknown limit exceeded')
+            print(f"❌ Usage limit exceeded: {reason}")
             raise HTTPException(
                 status_code=429, 
-                detail=f"Usage limit exceeded: {limits_check.get('reason', 'Unknown limit exceeded')}"
+                detail=f"Usage limit exceeded: {reason}"
             )
         
+        print(f"✅ Usage limits check passed")
+        
         # Get GCP assets
+        print(f"🌐 Fetching GCP assets for project {project_id}...")
         assets = await gcp_service.get_project_assets(project_id)
+        print(f"📊 Retrieved {len(assets) if assets else 0} assets")
+        
+        if assets:
+            asset_types = {}
+            for asset in assets:
+                asset_type = asset.get('assetType', 'unknown')
+                asset_types[asset_type] = asset_types.get(asset_type, 0) + 1
+            print(f"📊 Asset types: {asset_types}")
         
         # Run compliance analysis
+        print(f"🔍 Running compliance analysis...")
         violations = await compliance_service.analyze_violations(assets)
+        print(f"⚠️ Found {len(violations) if violations else 0} violations")
+        
+        if violations:
+            # Group violations by severity for debugging
+            severity_counts = {}
+            for violation in violations:
+                severity = violation.get('severity', 'unknown')
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            print(f"📊 Violations by severity: {severity_counts}")
         
         # Store results (includes usage tracking)
+        print(f"💾 Storing scan results...")
         scan_id = await compliance_service.store_scan_results(
             user_id=current_user["user_id"],
             project_id=project_id,
             violations=violations
         )
+        print(f"✅ Scan results stored with ID: {scan_id}")
         
-        return {
+        response_data = {
             "scan_id": scan_id,
             "project_id": project_id,
-            "violations_count": len(violations),
+            "violations_count": len(violations) if violations else 0,
             "status": "completed"
         }
+        
+        print(f"🎉 Compliance scan completed successfully")
+        print(f"📊 Final response: {response_data}")
+        
+        return response_data
     
+    except HTTPException as http_ex:
+        print(f"❌ HTTP Exception in compliance scan: {http_ex.detail}")
+        raise
     except Exception as e:
+        print(f"❌ Unexpected error in compliance scan: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/reports/{scan_id}")
@@ -104,10 +240,36 @@ async def get_compliance_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Get compliance report for a specific scan"""
+    print(f"📄 Compliance report request")
+    print(f"👤 User: {current_user.get('user_id')}")
+    print(f"🆔 Scan ID: {scan_id}")
+    
     try:
+        print(f"🔍 Fetching scan report via service...")
         report = await compliance_service.get_scan_report(scan_id, current_user["user_id"])
+        
+        if report:
+            print(f"✅ Report found")
+            print(f"📊 Report keys: {list(report.keys()) if isinstance(report, dict) else 'Not a dict'}")
+            
+            # Log some summary info without sensitive details
+            if isinstance(report, dict):
+                if 'violations' in report:
+                    violations_count = len(report['violations']) if report['violations'] else 0
+                    print(f"⚠️ Violations in report: {violations_count}")
+                if 'project_id' in report:
+                    print(f"🎯 Report project: {report['project_id']}")
+                if 'scan_timestamp' in report:
+                    print(f"🕰️ Scan timestamp: {report['scan_timestamp']}")
+        else:
+            print(f"❌ No report found for scan ID: {scan_id}")
+        
+        print(f"👤 Returning compliance report")
         return report
+        
     except Exception as e:
+        print(f"❌ Error fetching compliance report: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(status_code=404, detail="Report not found")
 
 @app.get("/api/v1/reports")
@@ -117,12 +279,34 @@ async def list_reports(
     offset: int = 0
 ):
     """List all compliance reports for the current user"""
+    print(f"📋 List reports request")
+    print(f"👤 User: {current_user.get('user_id')}")
+    print(f"📊 Limit: {limit}, Offset: {offset}")
+    
     try:
+        print(f"🔍 Fetching user reports via service...")
         reports = await compliance_service.list_user_reports(
             current_user["user_id"], limit, offset
         )
+        
+        print(f"✅ Found {len(reports) if reports else 0} reports")
+        
+        if reports and len(reports) > 0:
+            print(f"📊 First report keys: {list(reports[0].keys()) if isinstance(reports[0], dict) else 'Not a dict'}")
+            # Log summary without sensitive details
+            for i, report in enumerate(reports[:3]):  # Show first 3
+                if isinstance(report, dict):
+                    project_id = report.get('project_id', 'unknown')
+                    scan_id = report.get('scan_id', 'unknown')
+                    violations_count = len(report.get('violations', [])) if report.get('violations') else 0
+                    print(f"📊 Report {i+1}: {project_id} (scan: {scan_id[:8]}...) - {violations_count} violations")
+        
+        print(f"👤 Returning {len(reports) if reports else 0} reports")
         return reports
+        
     except Exception as e:
+        print(f"❌ Error listing reports: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/dashboard")
@@ -130,10 +314,32 @@ async def get_dashboard_data(
     current_user: dict = Depends(get_current_user)
 ):
     """Get dashboard summary data"""
+    print(f"📊 Dashboard data request")
+    print(f"👤 User: {current_user.get('user_id')}")
+    
     try:
+        print(f"🔍 Fetching dashboard summary via service...")
         dashboard_data = await compliance_service.get_dashboard_summary(current_user["user_id"])
+        
+        if dashboard_data:
+            print(f"✅ Dashboard data retrieved")
+            print(f"📊 Dashboard keys: {list(dashboard_data.keys()) if isinstance(dashboard_data, dict) else 'Not a dict'}")
+            
+            # Log summary info without sensitive details
+            if isinstance(dashboard_data, dict):
+                total_scans = dashboard_data.get('total_scans', 0)
+                total_violations = dashboard_data.get('total_violations', 0)
+                active_projects = dashboard_data.get('active_projects', 0)
+                print(f"📊 Summary: {total_scans} scans, {total_violations} violations, {active_projects} projects")
+        else:
+            print(f"⚠️ No dashboard data returned")
+        
+        print(f"👤 Returning dashboard data")
         return dashboard_data
+        
     except Exception as e:
+        print(f"❌ Error fetching dashboard data: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Admin-only endpoints with enhanced security
@@ -148,10 +354,21 @@ async def verify_admin_token(credentials: HTTPAuthorizationCredentials = Securit
 @app.post("/api/admin/v1/login")
 async def admin_login(email: str, password: str):
     """Admin login - step 1 (before 2FA)"""
+    print(f"🔑 Admin login attempt")
+    print(f"📧 Admin email: {email}")
+    print(f"🔐 Has password: {bool(password)}")
+    
     try:
+        print(f"🔍 Authenticating admin via service...")
         result = await admin_service.authenticate_admin(email, password)
+        
+        print(f"✅ Admin authentication step 1 completed")
+        print(f"📊 Auth result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        
         return result
     except Exception as e:
+        print(f"❌ Admin authentication failed: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(status_code=500, detail="Authentication failed")
 
 @app.post("/api/admin/v1/verify-2fa")
@@ -228,10 +445,27 @@ async def get_admin_audit_logs(
 @app.get("/api/v1/billing/plans")
 async def get_pricing_plans():
     """Get available pricing plans"""
+    print(f"💳 Pricing plans request")
+    
     try:
+        print(f"🔍 Fetching available plans via Stripe service...")
         plans = stripe_service.get_available_plans()
-        return {"plans": plans}
+        
+        print(f"✅ Found {len(plans) if plans else 0} pricing plans")
+        if plans:
+            for plan in plans:
+                if isinstance(plan, dict):
+                    plan_name = plan.get('name', 'unknown')
+                    plan_price = plan.get('price', 'unknown')
+                    print(f"📊 Plan: {plan_name} - ${plan_price}")
+        
+        response_data = {"plans": plans}
+        print(f"👤 Returning {len(plans) if plans else 0} plans")
+        return response_data
+        
     except Exception as e:
+        print(f"❌ Error fetching pricing plans: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/billing/create-customer")

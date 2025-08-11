@@ -27,22 +27,40 @@ async def upload_gcp_credentials(
     """
     Upload and securely store GCP service account credentials
     """
+    print(f"🔑 GCP credential upload request for user: {current_user.get('user_id')}")
+    print(f"🎯 Project ID: {credential_data.project_id}")
+    print(f"📝 Service account JSON keys: {list(credential_data.service_account_json.keys())}")
+    
+    # Extract some info for debugging (without logging sensitive data)
+    service_account_email = credential_data.service_account_json.get('client_email', 'unknown')
+    print(f"📧 Service account email: {service_account_email}")
+    
     try:
+        print(f"💾 Storing credentials via service...")
         result = await gcp_credential_service.store_credentials(
             user_id=current_user["user_id"],
             project_id=credential_data.project_id,
             service_account_json=credential_data.service_account_json
         )
         
-        return {
+        print(f"✅ GCP credentials stored successfully")
+        print(f"📊 Result keys: {list(result.keys())}")
+        
+        response_data = {
             "message": "GCP credentials stored successfully",
             "project_id": result["project_id"],
             "service_account_email": result["service_account_email"]
         }
         
-    except HTTPException:
+        print(f"👤 Returning response for project: {result['project_id']}")
+        return response_data
+        
+    except HTTPException as http_ex:
+        print(f"❌ HTTP Exception in GCP upload: {http_ex.detail}")
         raise
     except Exception as e:
+        print(f"❌ Unexpected error in GCP upload: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(
             status_code=500,
             detail="Failed to store GCP credentials"
@@ -57,25 +75,41 @@ async def upload_gcp_credentials_file(
     """
     Upload GCP service account JSON file
     """
+    print(f"📁 GCP file upload request for user: {current_user.get('user_id')}")
+    print(f"🎯 Project ID: {project_id}")
+    print(f"📎 Filename: {file.filename}")
+    print(f"📊 Content type: {file.content_type}")
+    
     try:
         # Validate file type
+        print(f"🔍 Validating file type...")
         if not file.filename.endswith('.json'):
+            print(f"❌ Invalid file type: {file.filename}")
             raise HTTPException(
                 status_code=400,
                 detail="Only JSON files are allowed"
             )
         
+        print(f"✅ File type validation passed")
+        
         # Read and parse JSON
+        print(f"📄 Reading file content...")
         content = await file.read()
+        print(f"📊 Content size: {len(content)} bytes")
+        
         try:
             service_account_json = json.loads(content.decode('utf-8'))
-        except json.JSONDecodeError:
+            print(f"✅ JSON parsed successfully")
+            print(f"📝 JSON keys: {list(service_account_json.keys())}")
+        except json.JSONDecodeError as json_err:
+            print(f"❌ JSON decode error: {json_err}")
             raise HTTPException(
                 status_code=400,
                 detail="Invalid JSON file format"
             )
         
         # Validate required fields
+        print(f"🔍 Validating required fields...")
         required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 
                           'client_email', 'client_id', 'auth_uri', 'token_uri']
         
@@ -83,33 +117,51 @@ async def upload_gcp_credentials_file(
                          if field not in service_account_json]
         
         if missing_fields:
+            print(f"❌ Missing required fields: {missing_fields}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid service account file. Missing fields: {missing_fields}"
             )
         
         if service_account_json['type'] != 'service_account':
+            print(f"❌ Invalid type: {service_account_json.get('type')}")
             raise HTTPException(
                 status_code=400,
                 detail="File must be a service account key"
             )
         
+        print(f"✅ Service account validation passed")
+        service_account_email = service_account_json.get('client_email', 'unknown')
+        json_project_id = service_account_json.get('project_id', 'unknown')
+        print(f"📧 Service account email: {service_account_email}")
+        print(f"🎯 JSON project ID: {json_project_id}")
+        
         # Store credentials
+        print(f"💾 Storing credentials via service...")
         result = await gcp_credential_service.store_credentials(
             user_id=current_user["user_id"],
             project_id=project_id,
             service_account_json=service_account_json
         )
         
-        return {
+        print(f"✅ GCP credentials file uploaded and stored successfully")
+        print(f"📊 Result keys: {list(result.keys())}")
+        
+        response_data = {
             "message": "GCP credentials uploaded and stored successfully",
             "project_id": result["project_id"],
             "service_account_email": result["service_account_email"]
         }
         
-    except HTTPException:
+        print(f"👤 Returning response for project: {result['project_id']}")
+        return response_data
+        
+    except HTTPException as http_ex:
+        print(f"❌ HTTP Exception in GCP file upload: {http_ex.detail}")
         raise
     except Exception as e:
+        print(f"❌ Unexpected error in GCP file upload: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(
             status_code=500,
             detail="Failed to upload GCP credentials"
@@ -122,13 +174,27 @@ async def list_gcp_projects(
     """
     List all GCP projects configured for the current user
     """
+    print(f"📋 List GCP projects request for user: {current_user.get('user_id')}")
+    
     try:
+        print(f"🔍 Querying user projects via service...")
         projects = await gcp_credential_service.list_user_projects(
             current_user["user_id"]
         )
+        
+        print(f"✅ Found {len(projects)} GCP projects")
+        if projects:
+            for i, project in enumerate(projects):
+                print(f"🎯 Project {i+1}: {project.get('project_id')} ({project.get('status')})")
+        else:
+            print(f"📎 No GCP projects configured for user")
+        
+        print(f"👤 Returning {len(projects)} projects")
         return projects
         
     except Exception as e:
+        print(f"❌ Error listing GCP projects: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(
             status_code=500,
             detail="Failed to list GCP projects"
@@ -142,20 +208,34 @@ async def revoke_gcp_credentials(
     """
     Revoke GCP credentials for a specific project
     """
+    print(f"🗑️ GCP credential revocation request")
+    print(f"👤 User: {current_user.get('user_id')}")
+    print(f"🎯 Project ID: {project_id}")
+    
     try:
+        print(f"🔄 Revoking credentials via service...")
         result = await gcp_credential_service.revoke_credentials(
             user_id=current_user["user_id"],
             project_id=project_id
         )
         
-        return {
+        print(f"✅ GCP credentials revoked successfully")
+        print(f"📊 Revocation result: {result}")
+        
+        response_data = {
             "message": f"GCP credentials revoked for project {project_id}",
             "project_id": project_id
         }
         
-    except HTTPException:
+        print(f"👤 Returning revocation confirmation")
+        return response_data
+        
+    except HTTPException as http_ex:
+        print(f"❌ HTTP Exception in GCP revocation: {http_ex.detail}")
         raise
     except Exception as e:
+        print(f"❌ Error revoking GCP credentials: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(
             status_code=500,
             detail="Failed to revoke GCP credentials"
@@ -169,30 +249,49 @@ async def check_gcp_project_status(
     """
     Check the status of GCP credentials for a project
     """
+    print(f"🔍 GCP project status check")
+    print(f"👤 User: {current_user.get('user_id')}")
+    print(f"🎯 Project ID: {project_id}")
+    
     try:
+        print(f"📋 Fetching user projects...")
         projects = await gcp_credential_service.list_user_projects(
             current_user["user_id"]
         )
         
+        print(f"🔍 Searching for project {project_id} in {len(projects)} projects")
         project = next((p for p in projects if p['project_id'] == project_id), None)
         
         if not project:
+            print(f"❌ GCP project {project_id} not found")
             raise HTTPException(
                 status_code=404,
                 detail="GCP project not found"
             )
         
-        return {
+        print(f"✅ Project found: {project.get('service_account_email')}")
+        print(f"📊 Project status: {project.get('status')}")
+        print(f"🕰️ Last used: {project.get('last_used', 'Never')}")
+        
+        connection_status = "connected" if project['status'] == 'active' else "disconnected"
+        
+        response_data = {
             "project_id": project_id,
             "status": project['status'],
             "service_account_email": project['service_account_email'],
             "last_used": project.get('last_used'),
-            "connection_status": "connected" if project['status'] == 'active' else "disconnected"
+            "connection_status": connection_status
         }
         
-    except HTTPException:
+        print(f"👤 Returning project status: {connection_status}")
+        return response_data
+        
+    except HTTPException as http_ex:
+        print(f"❌ HTTP Exception in project status: {http_ex.detail}")
         raise
     except Exception as e:
+        print(f"❌ Error checking project status: {type(e).__name__}: {str(e)}")
+        print(f"📊 Exception details: {repr(e)}")
         raise HTTPException(
             status_code=500,
             detail="Failed to check project status"
