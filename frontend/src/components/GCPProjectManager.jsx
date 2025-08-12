@@ -54,7 +54,7 @@ const GCPProjectManager = () => {
     }
   };
 
-  const handleOnboardingComplete = async (projectId) => {
+  const handleOnboardingComplete = async () => {
     await loadProjects(); // Reload to show the new project
     setShowOnboarding(false);
   };

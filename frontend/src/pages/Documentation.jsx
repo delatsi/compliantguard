@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useDemoData } from '../contexts/DemoContext';
 import { 
   DocumentTextIcon,
   PlusIcon,
@@ -20,7 +19,6 @@ import {
 
 const Documentation = () => {
   const location = useLocation();
-  const { demoData } = useDemoData();
   const isDemoMode = location.pathname.startsWith('/demo');
   
   const [searchTerm, setSearchTerm] = useState('');

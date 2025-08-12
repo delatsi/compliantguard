@@ -43,7 +43,7 @@ const AdminLogin = () => {
       } else {
         setError(result.error || 'Login failed');
       }
-    } catch (err) {
+    } catch {
       setError('Login failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -63,7 +63,7 @@ const AdminLogin = () => {
       } else {
         setError(result.error || '2FA verification failed');
       }
-    } catch (err) {
+    } catch {
       setError('2FA verification failed. Please try again.');
     } finally {
       setIsLoading(false);

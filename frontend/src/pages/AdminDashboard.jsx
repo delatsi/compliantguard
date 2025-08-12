@@ -36,7 +36,7 @@ const AdminDashboard = () => {
     } finally {
       setRefreshing(false);
     }
-  }, [selectedTimeRange]);
+  }, [getAdminDashboardData]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -418,7 +418,7 @@ const AdminDashboard = () => {
               </div>
               <div className="p-6">
                 <div className="space-y-4">
-                  {dashboardData.revenueMetrics.monthlyRevenue.map((month, index) => (
+                  {dashboardData.revenueMetrics.monthlyRevenue.map((month) => (
                     <div key={month.month} className="flex items-center justify-between">
                       <span className="text-sm font-medium text-gray-900">{month.month}</span>
                       <div className="flex items-center space-x-3">
@@ -693,7 +693,7 @@ const AdminDashboard = () => {
               </div>
               <div className="p-6">
                 <div className="space-y-3">
-                  {dashboardData.usageMetrics.popularFeatures.map((feature, index) => (
+                  {dashboardData.usageMetrics.popularFeatures.map((feature) => (
                     <div key={feature.feature} className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">{feature.feature}</span>
                       <div className="flex items-center space-x-2">

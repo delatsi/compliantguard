@@ -301,7 +301,7 @@ const Dashboard = () => {
             </h3>
             <div className="mt-4">
               <div className="flex items-end space-x-1 h-32">
-                {demoData.complianceMetrics.trendsData.slice(-15).map((point, index) => (
+                {demoData.complianceMetrics.trendsData.slice(-15).map((point) => (
                   <div key={point.date} className="flex-1 flex flex-col items-center">
                     <div 
                       className="w-full bg-primary-500 rounded-t"

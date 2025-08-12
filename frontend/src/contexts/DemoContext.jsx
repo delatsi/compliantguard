@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState } from 'react';
 
 const DemoContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useDemoData = () => {
   const context = useContext(DemoContext);
   if (!context) {
