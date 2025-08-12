@@ -6,8 +6,8 @@ from botocore.exceptions import ClientError
 import uuid
 from datetime import datetime
 
-from ..core.config import settings
-from ..core.auth import get_password_hash, verify_password, create_access_token, get_current_user
+from core.config import settings
+from core.auth import get_password_hash, verify_password, create_access_token, get_current_user
 
 router = APIRouter()
 

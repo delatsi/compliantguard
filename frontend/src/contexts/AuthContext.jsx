@@ -53,14 +53,23 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'LOGIN_START' });
       const response = await authAPI.login(email, password);
-      const { user, token } = response.data;
+      
+      // Handle our API response format
+      const data = response.data;
+      const token = data.access_token || data.token;
+      const user = {
+        id: data.user_id,
+        email: data.email,
+        role: data.role
+      };
       
       localStorage.setItem('token', token);
       dispatch({ type: 'LOGIN_SUCCESS', payload: user, token });
       return { success: true };
     } catch (error) {
-      dispatch({ type: 'LOGIN_FAILURE', error: error.response?.data?.message || 'Login failed' });
-      return { success: false, error: error.response?.data?.message || 'Login failed' };
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Login failed';
+      dispatch({ type: 'LOGIN_FAILURE', error: errorMessage });
+      return { success: false, error: errorMessage };
     }
   };
 

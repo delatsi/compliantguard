@@ -3,8 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, Dict, List
 import json
 
-from ..core.auth import get_current_user
-from ..services.gcp_credential_service import gcp_credential_service
+from core.auth import get_current_user
+from services.gcp_credential_service import gcp_credential_service
 
 router = APIRouter()
 

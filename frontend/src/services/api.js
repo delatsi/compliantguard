@@ -34,9 +34,9 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (email, password) => api.post('/api/v1/auth/login', { email, password }),
-  register: (userData) => api.post('/api/v1/auth/register', userData),
-  verifyToken: (token) => api.get('/api/v1/auth/verify', {
+  login: (email, password) => api.post('/login', { email, password }),
+  register: (userData) => api.post('/register', userData),
+  verifyToken: (token) => api.get('/auth/verify', {
     headers: { Authorization: `Bearer ${token}` }
   }),
 };
@@ -57,7 +57,7 @@ export const userAPI = {
 export const gcpAPI = {
   // Upload GCP credentials via JSON
   uploadCredentials: (projectId, serviceAccountJson) => 
-    api.post('/api/v1/gcp/credentials', {
+    api.post('/gcp/credentials', {
       project_id: projectId,
       service_account_json: serviceAccountJson
     }),

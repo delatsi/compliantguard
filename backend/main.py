@@ -10,19 +10,19 @@ from typing import Optional, List
 import boto3
 from botocore.exceptions import ClientError
 
-from .core.config import settings
-from .core.auth import verify_token, get_current_user
-from .routes.auth import router as auth_router
-from .routes.gcp import router as gcp_router
-from .models.compliance import ComplianceReport, ViolationSummary
-from .models.admin import AdminDashboardData
-from .models.subscription import (
+from core.config import settings
+from core.auth import verify_token, get_current_user
+from routes.auth import router as auth_router
+from routes.gcp import router as gcp_router
+from models.compliance import ComplianceReport, ViolationSummary
+from models.admin import AdminDashboardData
+from models.subscription import (
     CustomerSubscription, SubscriptionChangeRequest, PlanTier, BillingInterval
 )
-from .services.compliance_service import ComplianceService
-from .services.gcp_service import GCPAssetService
-from .services.admin_service import AdminService
-from .services.stripe_service import StripeService
+from services.compliance_service import ComplianceService
+from services.gcp_service import GCPAssetService
+from services.admin_service import AdminService
+from services.stripe_service import StripeService
 
 app = FastAPI(
     title="ThemisGuard HIPAA Compliance API",

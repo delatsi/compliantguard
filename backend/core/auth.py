@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 import boto3
 from botocore.exceptions import ClientError
 
-from .config import settings
+from core.config import settings
 
 security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

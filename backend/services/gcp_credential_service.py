@@ -12,7 +12,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from ..core.config import settings
+from core.config import settings
 
 logger = structlog.get_logger()
 

@@ -29,7 +29,7 @@ parallel = true
 
 [dev.deploy]
 [dev.deploy.parameters]
-stack_name = "themisguard-api-dev"
+stack_name = "themisguard-api-dev-debug"
 s3_bucket = ""
 s3_prefix = "themisguard-api-dev"
 region = "us-east-1"
@@ -38,14 +38,10 @@ capabilities = "CAPABILITY_IAM"
 parameter_overrides = [
     "Environment=dev",
     "ProjectName=themisguard",
-    "JWTSecretKey=your-secret-key-change-in-production",
-    "GCPProjectId=",
-    "GoogleClientId=",
-    "StripeSecretKey=sk_test_...",
-    "StripePublishableKey=pk_test_...",
-    "StripeWebhookSecret=whsec_...",
-    "CustomDomainName=",
-    "SSLCertificateArn="
+    "JWTSecretKey=your-secret-key-change-in-production-local-deploy",
+    "StripeSecretKey=sk_test_placeholder",
+    "StripePublishableKey=pk_test_placeholder",
+    "StripeWebhookSecret=whsec_placeholder"
 ]
 
 [staging]
