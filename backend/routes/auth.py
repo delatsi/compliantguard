@@ -4,12 +4,8 @@ from typing import Optional
 
 import boto3
 from botocore.exceptions import ClientError
-from core.auth import (
-    create_access_token,
-    get_current_user,
-    get_password_hash,
-    verify_password,
-)
+from core.auth import (create_access_token, get_current_user,
+                       get_password_hash, verify_password)
 from core.config import settings
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr

@@ -8,14 +8,9 @@ import boto3
 from botocore.exceptions import ClientError
 
 from ..core.config import settings
-from ..models.compliance import (
-    ComplianceReport,
-    DashboardData,
-    Violation,
-    ViolationSeverity,
-    ViolationSummary,
-    ViolationType,
-)
+from ..models.compliance import (ComplianceReport, DashboardData, Violation,
+                                 ViolationSeverity, ViolationSummary,
+                                 ViolationType)
 
 
 class ComplianceService:

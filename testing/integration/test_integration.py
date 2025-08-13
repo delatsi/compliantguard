@@ -133,7 +133,8 @@ def test_gcp_credential_service():
     print("=" * 35)
     
     try:
-        from backend.services.gcp_credential_service import GCPCredentialService
+        from backend.services.gcp_credential_service import \
+            GCPCredentialService
         
         service = GCPCredentialService()
         print("✅ GCP credential service initialized")

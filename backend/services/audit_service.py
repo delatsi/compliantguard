@@ -13,16 +13,9 @@ from typing import Any, Dict, List, Optional
 import boto3
 
 from ..core.config import settings
-from ..models.audit import (
-    AccessResult,
-    AuditEvent,
-    ComplianceEvent,
-    DataAccessPattern,
-    EventType,
-    SecurityEvent,
-    SecurityEventType,
-    Severity,
-)
+from ..models.audit import (AccessResult, AuditEvent, ComplianceEvent,
+                            DataAccessPattern, EventType, SecurityEvent,
+                            SecurityEventType, Severity)
 
 
 class AuditService:
