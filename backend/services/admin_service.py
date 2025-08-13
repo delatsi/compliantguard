@@ -9,10 +9,21 @@ import pyotp
 from botocore.exceptions import ClientError
 
 from ..core.config import settings
-from ..models.admin import (AdminAuditLog, AdminDashboardData, AdminPermission,
-                            AdminRole, AdminSession, AdminUser, ChurnAnalytics,
-                            CustomerMetrics, RevenueMetrics, SecurityMetrics,
-                            SupportMetrics, SystemHealthMetrics, UsageMetrics)
+from ..models.admin import (
+    AdminAuditLog,
+    AdminDashboardData,
+    AdminPermission,
+    AdminRole,
+    AdminSession,
+    AdminUser,
+    ChurnAnalytics,
+    CustomerMetrics,
+    RevenueMetrics,
+    SecurityMetrics,
+    SupportMetrics,
+    SystemHealthMetrics,
+    UsageMetrics,
+)
 
 
 class AdminService:

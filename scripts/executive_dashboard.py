@@ -19,44 +19,79 @@ def run_opa_analysis():
 
         # Query themisguard framework (has the most data)
         print("🔍 Querying themisguard.startup_framework...")
-        result = subprocess.run([
-            'opa', 'eval',
-            '--input', 'gcp_assets.json',
-            '--data', 'policies',
-            '--format', 'json',
-            'data.themisguard.startup_framework'
-        ], capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            [
+                "opa",
+                "eval",
+                "--input",
+                "gcp_assets.json",
+                "--data",
+                "policies",
+                "--format",
+                "json",
+                "data.themisguard.startup_framework",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
 
-        themisguard_data = json.loads(result.stdout)['result'][0]['expressions'][0]['value']
-        results['themisguard'] = themisguard_data
-        print(f"✅ Themisguard data loaded: {len(themisguard_data.get('violations', []))} violations")
+        themisguard_data = json.loads(result.stdout)["result"][0]["expressions"][0][
+            "value"
+        ]
+        results["themisguard"] = themisguard_data
+        print(
+            f"✅ Themisguard data loaded: {len(themisguard_data.get('violations', []))} violations"
+        )
 
         # Query GCP HIPAA violations
         print("🔍 Querying gcp.expanded_hipaa...")
-        result = subprocess.run([
-            'opa', 'eval',
-            '--input', 'gcp_assets.json',
-            '--data', 'policies',
-            '--format', 'json',
-            'data.gcp.expanded_hipaa.violations'
-        ], capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            [
+                "opa",
+                "eval",
+                "--input",
+                "gcp_assets.json",
+                "--data",
+                "policies",
+                "--format",
+                "json",
+                "data.gcp.expanded_hipaa.violations",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
 
-        gcp_violations = json.loads(result.stdout)['result'][0]['expressions'][0]['value']
-        results['gcp_violations'] = gcp_violations
+        gcp_violations = json.loads(result.stdout)["result"][0]["expressions"][0][
+            "value"
+        ]
+        results["gcp_violations"] = gcp_violations
         print(f"✅ GCP violations loaded: {len(gcp_violations)} violations")
 
         # Query HIPAA compliance violations
         print("🔍 Querying hipaa.compliance...")
-        result = subprocess.run([
-            'opa', 'eval',
-            '--input', 'gcp_assets.json',
-            '--data', 'policies',
-            '--format', 'json',
-            'data.hipaa.compliance.violations'
-        ], capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            [
+                "opa",
+                "eval",
+                "--input",
+                "gcp_assets.json",
+                "--data",
+                "policies",
+                "--format",
+                "json",
+                "data.hipaa.compliance.violations",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
 
-        hipaa_violations = json.loads(result.stdout)['result'][0]['expressions'][0]['value']
-        results['hipaa_violations'] = hipaa_violations
+        hipaa_violations = json.loads(result.stdout)["result"][0]["expressions"][0][
+            "value"
+        ]
+        results["hipaa_violations"] = hipaa_violations
         print(f"✅ HIPAA violations loaded: {len(hipaa_violations)} violations")
 
         return results
@@ -69,14 +104,15 @@ def run_opa_analysis():
         print(f"Error parsing OPA output: {e}")
         sys.exit(1)
 
+
 def convert_to_report_format(opa_results):
     """Convert OPA results to expected report format"""
 
     # Combine all violations
     all_violations = []
-    all_violations.extend(opa_results.get('gcp_violations', []))
-    all_violations.extend(opa_results.get('hipaa_violations', []))
-    all_violations.extend(opa_results.get('themisguard', {}).get('violations', []))
+    all_violations.extend(opa_results.get("gcp_violations", []))
+    all_violations.extend(opa_results.get("hipaa_violations", []))
+    all_violations.extend(opa_results.get("themisguard", {}).get("violations", []))
 
     print(f"🔍 Processing {len(all_violations)} total violations...")
 
@@ -84,10 +120,12 @@ def convert_to_report_format(opa_results):
     if all_violations:
         print(f"📋 Sample violation types:")
         for i, violation in enumerate(all_violations[:3]):  # Show first 3
-            print(f"   {i+1}. Type: {type(violation)}, Content: {str(violation)[:100]}...")
+            print(
+                f"   {i+1}. Type: {type(violation)}, Content: {str(violation)[:100]}..."
+            )
 
     # Get themisguard framework data
-    framework_data = opa_results.get('themisguard', {})
+    framework_data = opa_results.get("themisguard", {})
 
     # Categorize violations by severity/priority
     critical_issues = []
@@ -102,12 +140,12 @@ def convert_to_report_format(opa_results):
             formatted_violation = format_violation(violation, framework_data)
 
             # Categorize by severity or blocking status
-            severity = formatted_violation['risk_level']
-            if severity == 'CRITICAL':
+            severity = formatted_violation["risk_level"]
+            if severity == "CRITICAL":
                 critical_issues.append(formatted_violation)
-            elif severity == 'HIGH':
+            elif severity == "HIGH":
                 high_priority.append(formatted_violation)
-            elif severity == 'MEDIUM':
+            elif severity == "MEDIUM":
                 medium_priority.append(formatted_violation)
             else:
                 low_priority.append(formatted_violation)
@@ -118,13 +156,13 @@ def convert_to_report_format(opa_results):
             continue
 
     # Add MVP requirements as violations if they exist
-    mvc_requirements = framework_data.get('mvc_requirements', [])
+    mvc_requirements = framework_data.get("mvc_requirements", [])
     print(f"🎯 Processing {len(mvc_requirements)} MVP requirements...")
 
     for req in mvc_requirements:
         try:
             formatted_req = format_mvc_requirement(req)
-            if req.get('blocking', False):
+            if req.get("blocking", False):
                 critical_issues.append(formatted_req)
             else:
                 medium_priority.append(formatted_req)
@@ -141,7 +179,9 @@ def convert_to_report_format(opa_results):
     low_count = len(low_priority)
 
     print(f"📊 Categorization complete:")
-    print(f"   Critical: {critical_count}, High: {high_count}, Medium: {medium_count}, Low: {low_count}")
+    print(
+        f"   Critical: {critical_count}, High: {high_count}, Medium: {medium_count}, Low: {low_count}"
+    )
 
     # Determine compliance status
     if critical_count > 0:
@@ -162,7 +202,7 @@ def convert_to_report_format(opa_results):
         "immediate_actions": critical_issues,
         "this_week": high_priority[:10],  # Limit to top 10
         "this_month": medium_priority[:20],  # Limit to top 20
-        "quarterly": low_priority[:10]  # Limit to top 10
+        "quarterly": low_priority[:10],  # Limit to top 10
     }
 
     return {
@@ -173,14 +213,15 @@ def convert_to_report_format(opa_results):
             "high_count": high_count,
             "medium_count": medium_count,
             "low_count": low_count,
-            "overall_risk_score": risk_score
+            "overall_risk_score": risk_score,
         },
         "critical_issues": critical_issues,
         "high_priority": high_priority,
         "medium_priority": medium_priority,
         "low_priority": low_priority,
-        "remediation_plan": remediation_plan
+        "remediation_plan": remediation_plan,
     }
+
 
 def format_violation(violation, framework_data):
     """Format a violation into the expected structure"""
@@ -199,8 +240,8 @@ def format_violation(violation, framework_data):
                 "effort": "Medium",
                 "cost": "$1,000 - $5,000",
                 "timeline": "1-2 weeks",
-                "priority": "Medium"
-            }
+                "priority": "Medium",
+            },
         }
 
     elif not isinstance(violation, dict):
@@ -216,95 +257,118 @@ def format_violation(violation, framework_data):
                 "effort": "Medium",
                 "cost": "$1,000 - $5,000",
                 "timeline": "1-2 weeks",
-                "priority": "Medium"
-            }
+                "priority": "Medium",
+            },
         }
 
     # Handle dictionary violations
-    title = violation.get('title', violation.get('description', violation.get('message', 'Unknown Violation')))
-    risk_level = violation.get('severity', violation.get('risk_level', violation.get('priority', 'MEDIUM'))).upper()
+    title = violation.get(
+        "title",
+        violation.get("description", violation.get("message", "Unknown Violation")),
+    )
+    risk_level = violation.get(
+        "severity", violation.get("risk_level", violation.get("priority", "MEDIUM"))
+    ).upper()
 
     # Map risk levels
     risk_mapping = {
-        'CRITICAL': 'CRITICAL',
-        'HIGH': 'HIGH',
-        'MAJOR': 'HIGH',
-        'MEDIUM': 'MEDIUM',
-        'MODERATE': 'MEDIUM',
-        'LOW': 'LOW',
-        'MINOR': 'LOW',
-        'ERROR': 'HIGH',
-        'WARNING': 'MEDIUM',
-        'INFO': 'LOW'
+        "CRITICAL": "CRITICAL",
+        "HIGH": "HIGH",
+        "MAJOR": "HIGH",
+        "MEDIUM": "MEDIUM",
+        "MODERATE": "MEDIUM",
+        "LOW": "LOW",
+        "MINOR": "LOW",
+        "ERROR": "HIGH",
+        "WARNING": "MEDIUM",
+        "INFO": "LOW",
     }
-    risk_level = risk_mapping.get(risk_level, 'MEDIUM')
+    risk_level = risk_mapping.get(risk_level, "MEDIUM")
 
     # Business impact based on risk level
     impact_mapping = {
-        'CRITICAL': 'Blocks enterprise sales and creates major legal risk',
-        'HIGH': 'Significant compliance gap affecting customer trust',
-        'MEDIUM': 'Moderate risk requiring attention within 30 days',
-        'LOW': 'Administrative improvement for best practices'
+        "CRITICAL": "Blocks enterprise sales and creates major legal risk",
+        "HIGH": "Significant compliance gap affecting customer trust",
+        "MEDIUM": "Moderate risk requiring attention within 30 days",
+        "LOW": "Administrative improvement for best practices",
     }
 
     # Extract resource information
-    resource = violation.get('resource',
-                           violation.get('component',
-                           violation.get('asset',
-                           violation.get('service', 'Unknown'))))
+    resource = violation.get(
+        "resource",
+        violation.get(
+            "component", violation.get("asset", violation.get("service", "Unknown"))
+        ),
+    )
 
     # Extract remediation information
-    remediation_text = violation.get('remediation',
-                                   violation.get('fix',
-                                   violation.get('solution',
-                                   violation.get('recommendation', 'Review and implement appropriate controls'))))
+    remediation_text = violation.get(
+        "remediation",
+        violation.get(
+            "fix",
+            violation.get(
+                "solution",
+                violation.get(
+                    "recommendation", "Review and implement appropriate controls"
+                ),
+            ),
+        ),
+    )
 
     return {
         "title": title,
         "risk_level": risk_level,
         "business_impact": impact_mapping[risk_level],
         "affected_resource": str(resource),
-        "compliance_frameworks": violation.get('frameworks', violation.get('compliance', ['HIPAA'])),
+        "compliance_frameworks": violation.get(
+            "frameworks", violation.get("compliance", ["HIPAA"])
+        ),
         "remediation": {
             "action": remediation_text,
-            "effort": violation.get('effort', 'Medium'),
-            "cost": violation.get('cost', '$1,000 - $5,000'),
-            "timeline": violation.get('timeline', '1-2 weeks'),
-            "priority": risk_level.title()
-        }
+            "effort": violation.get("effort", "Medium"),
+            "cost": violation.get("cost", "$1,000 - $5,000"),
+            "timeline": violation.get("timeline", "1-2 weeks"),
+            "priority": risk_level.title(),
+        },
     }
+
 
 def format_mvc_requirement(req):
     """Format an MVP requirement into violation format"""
     return {
         "title": f"MVP Requirement: {req.get('description', req.get('control', 'Unknown'))}",
-        "risk_level": "CRITICAL" if req.get('blocking') else "MEDIUM",
-        "business_impact": "Required for MVP HIPAA compliance" if req.get('blocking') else "Recommended for compliance",
-        "affected_resource": req.get('category', 'General'),
+        "risk_level": "CRITICAL" if req.get("blocking") else "MEDIUM",
+        "business_impact": (
+            "Required for MVP HIPAA compliance"
+            if req.get("blocking")
+            else "Recommended for compliance"
+        ),
+        "affected_resource": req.get("category", "General"),
         "compliance_frameworks": ["HIPAA"],
         "remediation": {
-            "action": req.get('description', 'Implement required control'),
-            "effort": req.get('effort', 'Medium').title(),
-            "cost": req.get('cost', '$1,000'),
-            "timeline": "Immediate" if req.get('blocking') else "1-2 weeks",
-            "priority": "Critical" if req.get('blocking') else "Medium"
-        }
+            "action": req.get("description", "Implement required control"),
+            "effort": req.get("effort", "Medium").title(),
+            "cost": req.get("cost", "$1,000"),
+            "timeline": "Immediate" if req.get("blocking") else "1-2 weeks",
+            "priority": "Critical" if req.get("blocking") else "Medium",
+        },
     }
+
 
 def generate_executive_summary(report):
     """Generate executive summary section"""
-    summary = report['summary']
+    summary = report["summary"]
 
     status_emoji = {
-        'COMPLIANT': '✅',
-        'MOSTLY_COMPLIANT': '⚠️',
-        'NEEDS_IMPROVEMENT': '🔴',
-        'NON_COMPLIANT': '🚨'
+        "COMPLIANT": "✅",
+        "MOSTLY_COMPLIANT": "⚠️",
+        "NEEDS_IMPROVEMENT": "🔴",
+        "NON_COMPLIANT": "🚨",
     }
 
     # Calculate business metrics
-    critical_count = summary['critical_count']
-    high_count = summary['high_count']
+    critical_count = summary["critical_count"]
+    high_count = summary["high_count"]
 
     # Estimate business impact
     customer_blocking_issues = critical_count
@@ -374,10 +438,11 @@ def generate_executive_summary(report):
 - **Zero Downtime:** Most fixes can be implemented without service interruption
 """
 
+
 def generate_board_recommendations(report):
     """Generate board-level strategic recommendations"""
-    summary = report['summary']
-    critical_count = summary['critical_count']
+    summary = report["summary"]
+    critical_count = summary["critical_count"]
 
     return f"""
 ## 📋 Board Recommendations
@@ -418,6 +483,7 @@ def generate_board_recommendations(report):
 - [ ] **Documentation Complete:** All HIPAA policies and procedures documented
 """
 
+
 def generate_issue_section(issues, title, description):
     """Generate a section for a specific priority level"""
     if not issues:
@@ -426,7 +492,7 @@ def generate_issue_section(issues, title, description):
     section = f"\n## {title}\n{description}\n\n"
 
     for i, issue in enumerate(issues, 1):
-        remediation = issue['remediation']
+        remediation = issue["remediation"]
 
         section += f"""
 ### {i}. {issue['title']}
@@ -445,15 +511,16 @@ def generate_issue_section(issues, title, description):
 
 """
 
-        if 'command' in remediation:
+        if "command" in remediation:
             section += f"**Command:**\n```bash\n{remediation['command']}\n```\n\n"
-        elif 'steps' in remediation:
+        elif "steps" in remediation:
             section += "**Steps:**\n"
-            for step in remediation['steps']:
+            for step in remediation["steps"]:
                 section += f"1. {step}\n"
             section += "\n"
 
     return section
+
 
 def generate_remediation_plan(plan):
     """Generate prioritized remediation timeline"""
@@ -477,6 +544,7 @@ def generate_remediation_plan(plan):
 {', '.join([issue['title'] for issue in plan['quarterly']]) if plan['quarterly'] else 'None'}
 """
 
+
 def main():
     """Main report generation function"""
     print("🔍 Running HIPAA compliance analysis with existing policies...")
@@ -497,33 +565,33 @@ def main():
     markdown_report += generate_board_recommendations(report)
 
     markdown_report += generate_issue_section(
-        report['critical_issues'],
+        report["critical_issues"],
         "🚨 Critical Issues",
-        "These issues must be resolved immediately as they block customer acquisition or create major legal risk."
+        "These issues must be resolved immediately as they block customer acquisition or create major legal risk.",
     )
 
     markdown_report += generate_issue_section(
-        report['high_priority'],
+        report["high_priority"],
         "🔴 High Priority Issues",
-        "Significant compliance gaps that should be resolved within one week."
+        "Significant compliance gaps that should be resolved within one week.",
     )
 
     markdown_report += generate_issue_section(
-        report['medium_priority'],
+        report["medium_priority"],
         "⚠️ Medium Priority Issues",
-        "Important security improvements to complete within one month."
+        "Important security improvements to complete within one month.",
     )
 
     markdown_report += generate_issue_section(
-        report['low_priority'],
+        report["low_priority"],
         "ℹ️ Low Priority Issues",
-        "Administrative tasks for quarterly compliance review."
+        "Administrative tasks for quarterly compliance review.",
     )
 
-    markdown_report += generate_remediation_plan(report['remediation_plan'])
+    markdown_report += generate_remediation_plan(report["remediation_plan"])
 
     # Write report to file
-    report_file = Path('docs/hipaa_compliance_report.md')
+    report_file = Path("docs/hipaa_compliance_report.md")
     report_file.parent.mkdir(exist_ok=True)
     report_file.write_text(markdown_report)
 
@@ -532,12 +600,13 @@ def main():
     print(f"🎯 Status: {report['summary']['compliance_status']}")
 
     # Return exit code based on compliance status
-    if report['summary']['critical_count'] > 0:
+    if report["summary"]["critical_count"] > 0:
         sys.exit(1)  # Critical issues found
-    elif report['summary']['high_count'] > 0:
+    elif report["summary"]["high_count"] > 0:
         sys.exit(2)  # High priority issues found
     else:
         sys.exit(0)  # Acceptable compliance level
+
 
 if __name__ == "__main__":
     main()

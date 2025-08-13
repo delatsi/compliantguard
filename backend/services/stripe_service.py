@@ -8,12 +8,20 @@ import stripe
 from botocore.exceptions import ClientError
 
 from ..core.config import settings
-from ..models.subscription import (THEMISGUARD_PLANS, BillingInterval,
-                                   BillingPortalSession, CustomerSubscription,
-                                   Invoice, PaymentIntent, PlanTier,
-                                   PricingPlan, SubscriptionChangeRequest,
-                                   SubscriptionStatus, UsageRecord,
-                                   WebhookEvent)
+from ..models.subscription import (
+    THEMISGUARD_PLANS,
+    BillingInterval,
+    BillingPortalSession,
+    CustomerSubscription,
+    Invoice,
+    PaymentIntent,
+    PlanTier,
+    PricingPlan,
+    SubscriptionChangeRequest,
+    SubscriptionStatus,
+    UsageRecord,
+    WebhookEvent,
+)
 
 
 class StripeService:

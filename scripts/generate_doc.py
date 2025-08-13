@@ -1,27 +1,31 @@
 import json
 from datetime import datetime
 
-with open('violations.json') as f:
+with open("violations.json") as f:
     violations_data = json.load(f)
 
 # Debug: Print the structure to understand the format
 print("JSON structure:")
-print(json.dumps(violations_data, indent=2)[:500] + "..." if len(str(violations_data)) > 500 else json.dumps(violations_data, indent=2))
+print(
+    json.dumps(violations_data, indent=2)[:500] + "..."
+    if len(str(violations_data)) > 500
+    else json.dumps(violations_data, indent=2)
+)
 
 # Check for OPA errors first
-if 'errors' in violations_data and violations_data['errors']:
+if "errors" in violations_data and violations_data["errors"]:
     print("❌ OPA encountered errors:")
-    for error in violations_data['errors']:
+    for error in violations_data["errors"]:
         print(f"   • {error.get('message', 'Unknown error')}")
 
     # Generate error report
     md = f"# Violations Summary\n_Scanned: {datetime.utcnow().isoformat()}Z_\n\n"
     md += "## ❌ Scan Failed\n\n"
     md += "OPA encountered the following errors:\n\n"
-    for error in violations_data['errors']:
+    for error in violations_data["errors"]:
         md += f"- {error.get('message', 'Unknown error')}\n"
 
-    with open('docs/violations_summary.md', 'w') as f:
+    with open("docs/violations_summary.md", "w") as f:
         f.write(md)
 
     print("❌ Scan failed. Error report written to docs/violations_summary.md")
@@ -33,13 +37,13 @@ violations = None
 # Common OPA result structures to try
 possible_paths = [
     # Standard OPA format
-    lambda data: data['result'][0]['expressions'][0]['value'],
+    lambda data: data["result"][0]["expressions"][0]["value"],
     # Alternative OPA formats
-    lambda data: data['result'],
-    lambda data: data['results'][0]['expressions'][0]['value'],
-    lambda data: data['results'],
+    lambda data: data["result"],
+    lambda data: data["results"][0]["expressions"][0]["value"],
+    lambda data: data["results"],
     # Direct format
-    lambda data: data['violations'],
+    lambda data: data["violations"],
 ]
 
 for i, path_func in enumerate(possible_paths):
@@ -77,7 +81,7 @@ if violations:
 else:
     md += "✅ No violations found!\n"
 
-with open('docs/violations_summary.md', 'w') as f:
+with open("docs/violations_summary.md", "w") as f:
     f.write(md)
 
 print("✅ docs/violations_summary.md created!")

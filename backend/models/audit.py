@@ -263,7 +263,7 @@ def create_data_access_event(
     result: AccessResult,
     resource_id: str = None,
     error_message: str = None,
-    **kwargs
+    **kwargs,
 ) -> AuditEvent:
     """Create a standard data access audit event"""
     return AuditEvent(
@@ -276,7 +276,7 @@ def create_data_access_event(
         error_message=error_message,
         timestamp=datetime.utcnow(),
         event_type=EventType.DATA_ACCESS,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -286,7 +286,7 @@ def create_phi_access_event(
     action: str,
     purpose: str,
     minimum_necessary: bool = True,
-    **kwargs
+    **kwargs,
 ) -> ComplianceEvent:
     """Create a HIPAA PHI access compliance event"""
     return ComplianceEvent(
@@ -298,7 +298,7 @@ def create_phi_access_event(
         minimum_necessary=minimum_necessary,
         authorized_purpose=purpose,
         timestamp=datetime.utcnow(),
-        **kwargs
+        **kwargs,
     )
 
 
@@ -308,7 +308,7 @@ def create_security_event(
     description: str,
     user_id: str = None,
     customer_id: str = None,
-    **kwargs
+    **kwargs,
 ) -> SecurityEvent:
     """Create a security event"""
     return SecurityEvent(
@@ -318,5 +318,5 @@ def create_security_event(
         customer_id=customer_id,
         description=description,
         timestamp=datetime.utcnow(),
-        **kwargs
+        **kwargs,
     )

@@ -17,8 +17,10 @@ import boto3
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class DocumentType(Enum):
     """Supported document types for generation"""
+
     HIPAA_ASSESSMENT = "hipaa_assessment"
     SECURITY_POLICY = "security_policy"
     INCIDENT_RESPONSE = "incident_response_plan"
@@ -28,16 +30,20 @@ class DocumentType(Enum):
     PENETRATION_TEST = "penetration_test_report"
     VULNERABILITY_REPORT = "vulnerability_report"
 
+
 class BedrockModel(Enum):
     """Available Bedrock models"""
+
     CLAUDE_3_SONNET = "anthropic.claude-3-sonnet-20240229-v1:0"
     CLAUDE_3_HAIKU = "anthropic.claude-3-haiku-20240307-v1:0"
     CLAUDE_3_OPUS = "anthropic.claude-3-opus-20240229-v1:0"
     TITAN_TEXT = "amazon.titan-text-express-v1"
 
+
 @dataclass
 class DocumentContext:
     """Context information for document generation"""
+
     organization_name: str
     assessment_scope: List[str]
     compliance_frameworks: List[str]
@@ -45,64 +51,65 @@ class DocumentContext:
     findings: List[Dict[str, Any]]
     metadata: Dict[str, Any]
 
+
 class BedrockDocumentationGenerator:
     """Main class for generating security documentation using AWS Bedrock"""
-    
+
     def __init__(self, region_name: str = "us-east-1"):
         """Initialize the Bedrock client"""
-        self.bedrock_client = boto3.client('bedrock-runtime', region_name=region_name)
+        self.bedrock_client = boto3.client("bedrock-runtime", region_name=region_name)
         self.model_config = {
             BedrockModel.CLAUDE_3_SONNET: {
                 "max_tokens": 8000,
                 "temperature": 0.1,
-                "top_p": 0.9
+                "top_p": 0.9,
             },
             BedrockModel.CLAUDE_3_HAIKU: {
                 "max_tokens": 4000,
                 "temperature": 0.1,
-                "top_p": 0.9
-            }
+                "top_p": 0.9,
+            },
         }
-    
+
     async def generate_document(
-        self, 
-        doc_type: DocumentType, 
+        self,
+        doc_type: DocumentType,
         context: DocumentContext,
-        model: BedrockModel = BedrockModel.CLAUDE_3_SONNET
+        model: BedrockModel = BedrockModel.CLAUDE_3_SONNET,
     ) -> str:
         """Generate a security document using Bedrock"""
-        
+
         try:
             prompt = self._build_prompt(doc_type, context)
             response = await self._invoke_bedrock_model(model, prompt)
-            
+
             # Post-process and validate the response
             processed_response = self._post_process_response(response, doc_type)
-            
+
             return processed_response
-            
+
         except Exception as e:
             logger.error(f"Error generating document: {str(e)}")
             raise
-    
+
     def _build_prompt(self, doc_type: DocumentType, context: DocumentContext) -> str:
         """Build the prompt for document generation"""
-        
+
         prompts = {
             DocumentType.HIPAA_ASSESSMENT: self._build_hipaa_assessment_prompt,
             DocumentType.SECURITY_POLICY: self._build_security_policy_prompt,
             DocumentType.INCIDENT_RESPONSE: self._build_incident_response_prompt,
             DocumentType.RISK_ASSESSMENT: self._build_risk_assessment_prompt,
             DocumentType.COMPLIANCE_REPORT: self._build_compliance_report_prompt,
-            DocumentType.VULNERABILITY_REPORT: self._build_vulnerability_report_prompt
+            DocumentType.VULNERABILITY_REPORT: self._build_vulnerability_report_prompt,
         }
-        
+
         prompt_builder = prompts.get(doc_type)
         if not prompt_builder:
             raise ValueError(f"Unsupported document type: {doc_type}")
-        
+
         return prompt_builder(context)
-    
+
     def _build_hipaa_assessment_prompt(self, context: DocumentContext) -> str:
         """Build prompt for HIPAA assessment report"""
         return f"""
@@ -290,21 +297,22 @@ Include a risk-based prioritization matrix for remediation efforts.
 
     async def _invoke_bedrock_model(self, model: BedrockModel, prompt: str) -> str:
         """Invoke the Bedrock model with the generated prompt"""
-        
-        config = self.model_config.get(model, self.model_config[BedrockModel.CLAUDE_3_SONNET])
-        
-        if model in [BedrockModel.CLAUDE_3_SONNET, BedrockModel.CLAUDE_3_HAIKU, BedrockModel.CLAUDE_3_OPUS]:
+
+        config = self.model_config.get(
+            model, self.model_config[BedrockModel.CLAUDE_3_SONNET]
+        )
+
+        if model in [
+            BedrockModel.CLAUDE_3_SONNET,
+            BedrockModel.CLAUDE_3_HAIKU,
+            BedrockModel.CLAUDE_3_OPUS,
+        ]:
             body = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": config["max_tokens"],
                 "temperature": config["temperature"],
                 "top_p": config["top_p"],
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+                "messages": [{"role": "user", "content": prompt}],
             }
         else:
             # Titan model format
@@ -313,30 +321,33 @@ Include a risk-based prioritization matrix for remediation efforts.
                 "textGenerationConfig": {
                     "maxTokenCount": config["max_tokens"],
                     "temperature": config["temperature"],
-                    "topP": config["top_p"]
-                }
+                    "topP": config["top_p"],
+                },
             }
-        
+
         try:
             response = self.bedrock_client.invoke_model(
-                modelId=model.value,
-                body=json.dumps(body)
+                modelId=model.value, body=json.dumps(body)
             )
-            
-            response_body = json.loads(response['body'].read())
-            
-            if model in [BedrockModel.CLAUDE_3_SONNET, BedrockModel.CLAUDE_3_HAIKU, BedrockModel.CLAUDE_3_OPUS]:
-                return response_body['content'][0]['text']
+
+            response_body = json.loads(response["body"].read())
+
+            if model in [
+                BedrockModel.CLAUDE_3_SONNET,
+                BedrockModel.CLAUDE_3_HAIKU,
+                BedrockModel.CLAUDE_3_OPUS,
+            ]:
+                return response_body["content"][0]["text"]
             else:
-                return response_body['results'][0]['outputText']
-                
+                return response_body["results"][0]["outputText"]
+
         except Exception as e:
             logger.error(f"Error invoking Bedrock model {model.value}: {str(e)}")
             raise
-    
+
     def _post_process_response(self, response: str, doc_type: DocumentType) -> str:
         """Post-process the model response"""
-        
+
         # Add document metadata
         metadata = f"""
 ---
@@ -347,18 +358,18 @@ Version: 1.0
 ---
 
 """
-        
+
         # Clean up the response
         cleaned_response = response.strip()
-        
+
         # Add any document-specific formatting
         if doc_type == DocumentType.HIPAA_ASSESSMENT:
             cleaned_response = self._format_hipaa_document(cleaned_response)
         elif doc_type == DocumentType.SECURITY_POLICY:
             cleaned_response = self._format_policy_document(cleaned_response)
-        
+
         return metadata + cleaned_response
-    
+
     def _format_hipaa_document(self, content: str) -> str:
         """Format HIPAA-specific document"""
         # Add HIPAA-specific formatting, disclaimers, etc.
@@ -367,7 +378,7 @@ Version: 1.0
 
 """
         return disclaimer + content
-    
+
     def _format_policy_document(self, content: str) -> str:
         """Format policy document"""
         header = """
@@ -378,53 +389,57 @@ This document contains sensitive security information and should be handled acco
 """
         return header + content
 
+
 # Example usage and validation functions
 class DocumentValidator:
     """Validate generated documents for completeness and quality"""
-    
+
     @staticmethod
     def validate_hipaa_assessment(document: str) -> Dict[str, Any]:
         """Validate HIPAA assessment document"""
         required_sections = [
             "Executive Summary",
             "Administrative Safeguards",
-            "Physical Safeguards", 
+            "Physical Safeguards",
             "Technical Safeguards",
             "Risk Analysis",
-            "Recommendations"
+            "Recommendations",
         ]
-        
+
         validation_results = {
             "is_valid": True,
             "missing_sections": [],
             "quality_score": 0,
-            "recommendations": []
+            "recommendations": [],
         }
-        
+
         for section in required_sections:
             if section.lower() not in document.lower():
                 validation_results["missing_sections"].append(section)
                 validation_results["is_valid"] = False
-        
+
         # Calculate quality score based on various factors
         word_count = len(document.split())
         if word_count < 1000:
             validation_results["quality_score"] = 50
-            validation_results["recommendations"].append("Document appears too short for comprehensive assessment")
+            validation_results["recommendations"].append(
+                "Document appears too short for comprehensive assessment"
+            )
         elif word_count > 5000:
             validation_results["quality_score"] = 95
         else:
             validation_results["quality_score"] = 75
-        
+
         return validation_results
+
 
 # Example implementation
 async def generate_hipaa_assessment_example():
     """Example of generating a HIPAA assessment report"""
-    
+
     # Initialize the generator
     doc_generator = BedrockDocumentationGenerator()
-    
+
     # Create context
     context = DocumentContext(
         organization_name="Acme Healthcare Corp",
@@ -438,44 +453,43 @@ async def generate_hipaa_assessment_example():
                 "title": "Unencrypted Data Storage",
                 "description": "Patient data stored without encryption",
                 "affected_systems": ["Database Server"],
-                "cvss_score": 7.5
+                "cvss_score": 7.5,
             },
             {
-                "id": "F002", 
+                "id": "F002",
                 "severity": "Medium",
                 "title": "Weak Password Policy",
                 "description": "Password policy does not meet HIPAA requirements",
                 "affected_systems": ["All Systems"],
-                "cvss_score": 5.3
-            }
+                "cvss_score": 5.3,
+            },
         ],
         metadata={
             "assessment_date": "2024-01-15",
             "assessor": "Security Team",
-            "previous_assessment": "2023-01-15"
-        }
+            "previous_assessment": "2023-01-15",
+        },
     )
-    
+
     # Generate the document
     try:
         hipaa_report = await doc_generator.generate_document(
-            DocumentType.HIPAA_ASSESSMENT,
-            context,
-            BedrockModel.CLAUDE_3_SONNET
+            DocumentType.HIPAA_ASSESSMENT, context, BedrockModel.CLAUDE_3_SONNET
         )
-        
+
         # Validate the document
         validator = DocumentValidator()
         validation_results = validator.validate_hipaa_assessment(hipaa_report)
-        
+
         print(f"Document generated successfully!")
         print(f"Validation Results: {validation_results}")
-        
+
         return hipaa_report
-        
+
     except Exception as e:
         print(f"Error generating document: {str(e)}")
         return None
+
 
 if __name__ == "__main__":
     # Run the example

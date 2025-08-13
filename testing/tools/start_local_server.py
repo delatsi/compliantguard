@@ -7,13 +7,13 @@ import sys
 from pathlib import Path
 
 # Set environment variables for local development
-os.environ['AWS_REGION'] = 'us-east-1'
-os.environ['DYNAMODB_TABLE_NAME'] = 'themisguard-dev-scans'
-os.environ['GCP_CREDENTIALS_TABLE'] = 'themisguard-dev-gcp-credentials'
-os.environ['KMS_KEY_ALIAS'] = 'alias/compliantguard-gcp-credentials'
-os.environ['JWT_SECRET_KEY'] = 'local-dev-secret-key-not-for-production'
-os.environ['ENVIRONMENT'] = 'development'
-os.environ['S3_BUCKET_NAME'] = 'themisguard-dev-reports'
+os.environ["AWS_REGION"] = "us-east-1"
+os.environ["DYNAMODB_TABLE_NAME"] = "themisguard-dev-scans"
+os.environ["GCP_CREDENTIALS_TABLE"] = "themisguard-dev-gcp-credentials"
+os.environ["KMS_KEY_ALIAS"] = "alias/compliantguard-gcp-credentials"
+os.environ["JWT_SECRET_KEY"] = "local-dev-secret-key-not-for-production"
+os.environ["ENVIRONMENT"] = "development"
+os.environ["S3_BUCKET_NAME"] = "themisguard-dev-reports"
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent / "backend"))
@@ -34,38 +34,38 @@ try:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Add a development info endpoint
     @app.get("/dev/info")
     async def dev_info():
         return {
             "environment": "development",
-            "aws_region": os.environ.get('AWS_REGION'),
-            "dynamodb_table": os.environ.get('DYNAMODB_TABLE_NAME'),
-            "gcp_table": os.environ.get('GCP_CREDENTIALS_TABLE'),
-            "kms_key": os.environ.get('KMS_KEY_ALIAS'),
-            "s3_bucket": os.environ.get('S3_BUCKET_NAME'),
+            "aws_region": os.environ.get("AWS_REGION"),
+            "dynamodb_table": os.environ.get("DYNAMODB_TABLE_NAME"),
+            "gcp_table": os.environ.get("GCP_CREDENTIALS_TABLE"),
+            "kms_key": os.environ.get("KMS_KEY_ALIAS"),
+            "s3_bucket": os.environ.get("S3_BUCKET_NAME"),
             "endpoints": {
                 "auth": {
                     "register": "POST /api/v1/auth/register",
-                    "login": "POST /api/v1/auth/login", 
-                    "verify": "GET /api/v1/auth/verify"
+                    "login": "POST /api/v1/auth/login",
+                    "verify": "GET /api/v1/auth/verify",
                 },
                 "gcp": {
                     "upload_file": "POST /api/v1/gcp/credentials/upload",
                     "upload_json": "POST /api/v1/gcp/credentials",
                     "list_projects": "GET /api/v1/gcp/projects",
                     "project_status": "GET /api/v1/gcp/projects/{id}/status",
-                    "revoke": "DELETE /api/v1/gcp/projects/{id}/credentials"
-                }
+                    "revoke": "DELETE /api/v1/gcp/projects/{id}/credentials",
+                },
             },
             "test_credentials": {
                 "email": "test@example.com",
                 "password": "testpass123",
-                "note": "Use these to login or register a new account"
-            }
+                "note": "Use these to login or register a new account",
+            },
         }
-    
+
     if __name__ == "__main__":
         print("🚀 Starting CompliantGuard Local Development Server")
         print("=" * 55)
@@ -92,9 +92,9 @@ try:
         print("")
         print("Press Ctrl+C to stop the server")
         print("=" * 55)
-        
+
         uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-        
+
 except ImportError as e:
     print(f"❌ Missing dependency: {e}")
     print("\nTo install required dependencies:")

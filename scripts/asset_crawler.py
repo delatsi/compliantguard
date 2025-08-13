@@ -9,7 +9,9 @@ PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 CREDS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 if not PROJECT_ID or not CREDS_PATH:
-    raise EnvironmentError("Set GCP_PROJECT_ID and GOOGLE_APPLICATION_CREDENTIALS environment variables.")
+    raise EnvironmentError(
+        "Set GCP_PROJECT_ID and GOOGLE_APPLICATION_CREDENTIALS environment variables."
+    )
 
 credentials = service_account.Credentials.from_service_account_file(CREDS_PATH)
 client = asset_v1.AssetServiceClient(credentials=credentials)

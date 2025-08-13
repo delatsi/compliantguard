@@ -6,8 +6,7 @@ from typing import List, Optional
 
 import boto3
 from botocore.exceptions import ClientError
-from fastapi import (Depends, FastAPI, File, Form, HTTPException, Security,
-                     UploadFile)
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from mangum import Mangum
@@ -19,8 +18,12 @@ from core.auth import get_current_user, verify_token
 from core.config import settings
 from models.admin import AdminDashboardData
 from models.compliance import ComplianceReport, ViolationSummary
-from models.subscription import (BillingInterval, CustomerSubscription,
-                                 PlanTier, SubscriptionChangeRequest)
+from models.subscription import (
+    BillingInterval,
+    CustomerSubscription,
+    PlanTier,
+    SubscriptionChangeRequest,
+)
 from routes.auth import router as auth_router
 from routes.gcp import router as gcp_router
 from services.admin_service import AdminService
