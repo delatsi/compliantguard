@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from enum import Enum
 
+
 class SubscriptionStatus(str, Enum):
     ACTIVE = "active"
     TRIALING = "trialing"
@@ -12,17 +13,21 @@ class SubscriptionStatus(str, Enum):
     INCOMPLETE = "incomplete"
     INCOMPLETE_EXPIRED = "incomplete_expired"
 
+
 class PlanTier(str, Enum):
     STARTER = "starter"
     PROFESSIONAL = "professional"
     ENTERPRISE = "enterprise"
 
+
 class BillingInterval(str, Enum):
     MONTHLY = "month"
     ANNUAL = "year"
 
+
 class PricingPlan(BaseModel):
     """ThemisGuard subscription plans"""
+
     plan_id: str
     tier: PlanTier
     name: str
@@ -40,8 +45,10 @@ class PricingPlan(BaseModel):
     sso_enabled: bool = False
     custom_policies: bool = False
 
+
 class CustomerSubscription(BaseModel):
     """Customer subscription details"""
+
     subscription_id: str
     customer_id: str  # Our internal customer ID
     stripe_customer_id: str
@@ -57,8 +64,10 @@ class CustomerSubscription(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
+
 class UsageRecord(BaseModel):
     """Track usage for billing purposes"""
+
     usage_id: str
     customer_id: str
     subscription_id: str
@@ -69,8 +78,10 @@ class UsageRecord(BaseModel):
     violations_found: int = 0
     month_year: str  # Format: "2024-01" for aggregation
 
+
 class PaymentIntent(BaseModel):
     """Payment intent for one-time payments or setup"""
+
     payment_intent_id: str
     customer_id: str
     stripe_payment_intent_id: str
@@ -80,8 +91,10 @@ class PaymentIntent(BaseModel):
     description: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
 
+
 class Invoice(BaseModel):
     """Invoice tracking"""
+
     invoice_id: str
     customer_id: str
     subscription_id: str
@@ -94,8 +107,10 @@ class Invoice(BaseModel):
     paid_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
 
+
 class WebhookEvent(BaseModel):
     """Stripe webhook event tracking"""
+
     event_id: str
     stripe_event_id: str
     event_type: str
@@ -103,6 +118,7 @@ class WebhookEvent(BaseModel):
     processed_at: Optional[datetime] = None
     data: Dict[str, Any]
     created_at: datetime = Field(default_factory=datetime.now)
+
 
 # Pre-defined pricing plans for ThemisGuard
 THEMISGUARD_PLANS = {
@@ -119,7 +135,7 @@ THEMISGUARD_PLANS = {
             "Environment separation detection",
             "Basic reporting dashboard",
             "Email support",
-            "Up to 3 projects"
+            "Up to 3 projects",
         ],
         scan_limit=100,
         project_limit=3,
@@ -127,26 +143,25 @@ THEMISGUARD_PLANS = {
         api_access=False,
         priority_support=False,
         sso_enabled=False,
-        custom_policies=False
+        custom_policies=False,
     ),
-    
     PlanTier.PROFESSIONAL: PricingPlan(
         plan_id="professional",
         tier=PlanTier.PROFESSIONAL,
-        name="Professional", 
+        name="Professional",
         description="For growing companies with regular compliance needs",
         price_monthly=99.00,
         price_annual=990.00,  # 2 months free
         features=[
             "Up to 500 scans per month",
             "HIPAA compliance scanning",
-            "Environment separation detection", 
+            "Environment separation detection",
             "SOC 2 readiness reports",
             "Advanced analytics dashboard",
             "Priority email support",
             "Up to 10 projects",
             "API access",
-            "Custom policy templates"
+            "Custom policy templates",
         ],
         scan_limit=500,
         project_limit=10,
@@ -154,9 +169,8 @@ THEMISGUARD_PLANS = {
         api_access=True,
         priority_support=True,
         sso_enabled=False,
-        custom_policies=True
+        custom_policies=True,
     ),
-    
     PlanTier.ENTERPRISE: PricingPlan(
         plan_id="enterprise",
         tier=PlanTier.ENTERPRISE,
@@ -168,7 +182,7 @@ THEMISGUARD_PLANS = {
             "Unlimited scans",
             "HIPAA compliance scanning",
             "Environment separation detection",
-            "SOC 2 readiness reports", 
+            "SOC 2 readiness reports",
             "Custom compliance frameworks",
             "Advanced analytics & churn prediction",
             "Priority phone & email support",
@@ -176,7 +190,7 @@ THEMISGUARD_PLANS = {
             "Full API access",
             "SSO integration",
             "Custom policy creation",
-            "Dedicated customer success manager"
+            "Dedicated customer success manager",
         ],
         scan_limit=None,  # Unlimited
         project_limit=None,  # Unlimited
@@ -184,20 +198,24 @@ THEMISGUARD_PLANS = {
         api_access=True,
         priority_support=True,
         sso_enabled=True,
-        custom_policies=True
-    )
+        custom_policies=True,
+    ),
 }
+
 
 class SubscriptionChangeRequest(BaseModel):
     """Request to change subscription"""
+
     customer_id: str
     new_plan_tier: PlanTier
     new_billing_interval: BillingInterval
     effective_date: Optional[datetime] = None
     prorate: bool = True
 
+
 class BillingPortalSession(BaseModel):
     """Stripe customer portal session"""
+
     session_id: str
     customer_id: str
     stripe_session_id: str

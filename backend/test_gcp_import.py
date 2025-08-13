@@ -9,14 +9,16 @@ print("=" * 50)
 try:
     print("1. Testing core imports...")
     from fastapi import APIRouter
+
     print("✓ FastAPI imported")
-    
+
     from core.config import settings
+
     print("✓ Settings imported")
-    
+
     print(f"✓ KMS Key Alias: {settings.KMS_KEY_ALIAS}")
     print(f"✓ GCP Credentials Table: {settings.GCP_CREDENTIALS_TABLE}")
-    
+
 except Exception as e:
     print(f"✗ Core imports failed: {e}")
     traceback.print_exc()
@@ -25,11 +27,13 @@ except Exception as e:
 try:
     print("\n2. Testing Google Cloud imports...")
     from google.oauth2 import service_account
+
     print("✓ google.oauth2.service_account imported")
-    
+
     from googleapiclient.discovery import build
+
     print("✓ googleapiclient.discovery imported")
-    
+
 except Exception as e:
     print(f"✗ Google Cloud imports failed: {e}")
     print("This is likely the issue - missing dependencies")
@@ -39,8 +43,9 @@ except Exception as e:
 try:
     print("\n3. Testing GCP credential service...")
     from services.gcp_credential_service import gcp_credential_service
+
     print("✓ GCP credential service imported")
-    
+
 except Exception as e:
     print(f"✗ GCP credential service failed: {e}")
     traceback.print_exc()
@@ -49,13 +54,14 @@ except Exception as e:
 try:
     print("\n4. Testing GCP router...")
     from routes.gcp import router as gcp_router
+
     print("✓ GCP router imported")
-    
+
     routes = [route.path for route in gcp_router.routes]
     print(f"✓ Router has {len(routes)} routes:")
     for route in routes:
         print(f"  - {route}")
-    
+
 except Exception as e:
     print(f"✗ GCP router failed: {e}")
     traceback.print_exc()

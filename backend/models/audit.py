@@ -53,6 +53,7 @@ class Severity(Enum):
 @dataclass
 class AuditEvent:
     """Core audit event structure"""
+
     user_id: str
     customer_id: Optional[str]
     action: str
@@ -70,42 +71,45 @@ class AuditEvent:
     data_classification: Optional[str] = None
     compliance_tags: List[str] = None
     additional_context: Dict[str, Any] = None
-    
+
     def __post_init__(self):
         if self.compliance_tags is None:
             self.compliance_tags = []
         if self.additional_context is None:
             self.additional_context = {}
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage"""
         return {
-            'audit_id': str(uuid.uuid4()),
-            'user_id': self.user_id,
-            'customer_id': self.customer_id,
-            'action': self.action,
-            'resource_type': self.resource_type,
-            'resource_id': self.resource_id,
-            'result': self.result.value,
-            'event_type': self.event_type.value,
-            'timestamp': self.timestamp.isoformat(),
-            'error_message': self.error_message,
-            'ip_address': self.ip_address,
-            'user_agent': self.user_agent,
-            'session_id': self.session_id,
-            'request_id': self.request_id,
-            'duration_ms': self.duration_ms,
-            'data_classification': self.data_classification,
-            'compliance_tags': self.compliance_tags,
-            'additional_context': self.additional_context,
-            'created_at': datetime.utcnow().isoformat(),
-            'ttl': int((datetime.utcnow().timestamp()) + (7 * 365 * 24 * 60 * 60))  # 7 years
+            "audit_id": str(uuid.uuid4()),
+            "user_id": self.user_id,
+            "customer_id": self.customer_id,
+            "action": self.action,
+            "resource_type": self.resource_type,
+            "resource_id": self.resource_id,
+            "result": self.result.value,
+            "event_type": self.event_type.value,
+            "timestamp": self.timestamp.isoformat(),
+            "error_message": self.error_message,
+            "ip_address": self.ip_address,
+            "user_agent": self.user_agent,
+            "session_id": self.session_id,
+            "request_id": self.request_id,
+            "duration_ms": self.duration_ms,
+            "data_classification": self.data_classification,
+            "compliance_tags": self.compliance_tags,
+            "additional_context": self.additional_context,
+            "created_at": datetime.utcnow().isoformat(),
+            "ttl": int(
+                (datetime.utcnow().timestamp()) + (7 * 365 * 24 * 60 * 60)
+            ),  # 7 years
         }
 
 
 @dataclass
 class SecurityEvent:
     """Security-specific event structure"""
+
     event_type: SecurityEventType
     severity: Severity
     user_id: Optional[str]
@@ -124,7 +128,7 @@ class SecurityEvent:
     related_events: List[str] = None
     threat_indicators: Dict[str, Any] = None
     response_actions: List[str] = None
-    
+
     def __post_init__(self):
         if self.related_events is None:
             self.related_events = []
@@ -132,37 +136,40 @@ class SecurityEvent:
             self.threat_indicators = {}
         if self.response_actions is None:
             self.response_actions = []
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage"""
         return {
-            'security_event_id': str(uuid.uuid4()),
-            'event_type': self.event_type.value,
-            'severity': self.severity.value,
-            'user_id': self.user_id,
-            'customer_id': self.customer_id,
-            'description': self.description,
-            'timestamp': self.timestamp.isoformat(),
-            'ip_address': self.ip_address,
-            'user_agent': self.user_agent,
-            'session_id': self.session_id,
-            'source_system': self.source_system,
-            'detection_method': self.detection_method,
-            'false_positive': self.false_positive,
-            'investigated': self.investigated,
-            'resolved': self.resolved,
-            'resolution_notes': self.resolution_notes,
-            'related_events': self.related_events,
-            'threat_indicators': self.threat_indicators,
-            'response_actions': self.response_actions,
-            'created_at': datetime.utcnow().isoformat(),
-            'ttl': int((datetime.utcnow().timestamp()) + (7 * 365 * 24 * 60 * 60))  # 7 years
+            "security_event_id": str(uuid.uuid4()),
+            "event_type": self.event_type.value,
+            "severity": self.severity.value,
+            "user_id": self.user_id,
+            "customer_id": self.customer_id,
+            "description": self.description,
+            "timestamp": self.timestamp.isoformat(),
+            "ip_address": self.ip_address,
+            "user_agent": self.user_agent,
+            "session_id": self.session_id,
+            "source_system": self.source_system,
+            "detection_method": self.detection_method,
+            "false_positive": self.false_positive,
+            "investigated": self.investigated,
+            "resolved": self.resolved,
+            "resolution_notes": self.resolution_notes,
+            "related_events": self.related_events,
+            "threat_indicators": self.threat_indicators,
+            "response_actions": self.response_actions,
+            "created_at": datetime.utcnow().isoformat(),
+            "ttl": int(
+                (datetime.utcnow().timestamp()) + (7 * 365 * 24 * 60 * 60)
+            ),  # 7 years
         }
 
 
 @dataclass
 class ComplianceEvent:
     """HIPAA and other compliance-specific events"""
+
     compliance_type: str  # HIPAA, SOC2, PCI, etc.
     event_category: str
     user_id: str
@@ -178,38 +185,43 @@ class ComplianceEvent:
     approved_by: Optional[str] = None
     approval_timestamp: Optional[datetime] = None
     audit_trail_id: Optional[str] = None
-    
+
     def __post_init__(self):
         if self.data_elements_accessed is None:
             self.data_elements_accessed = []
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage"""
         return {
-            'compliance_event_id': str(uuid.uuid4()),
-            'compliance_type': self.compliance_type,
-            'event_category': self.event_category,
-            'user_id': self.user_id,
-            'customer_id': self.customer_id,
-            'phi_accessed': self.phi_accessed,
-            'minimum_necessary': self.minimum_necessary,
-            'authorized_purpose': self.authorized_purpose,
-            'timestamp': self.timestamp.isoformat(),
-            'duration_ms': self.duration_ms,
-            'data_elements_accessed': self.data_elements_accessed,
-            'business_justification': self.business_justification,
-            'approval_required': self.approval_required,
-            'approved_by': self.approved_by,
-            'approval_timestamp': self.approval_timestamp.isoformat() if self.approval_timestamp else None,
-            'audit_trail_id': self.audit_trail_id,
-            'created_at': datetime.utcnow().isoformat(),
-            'ttl': int((datetime.utcnow().timestamp()) + (7 * 365 * 24 * 60 * 60))  # 7 years
+            "compliance_event_id": str(uuid.uuid4()),
+            "compliance_type": self.compliance_type,
+            "event_category": self.event_category,
+            "user_id": self.user_id,
+            "customer_id": self.customer_id,
+            "phi_accessed": self.phi_accessed,
+            "minimum_necessary": self.minimum_necessary,
+            "authorized_purpose": self.authorized_purpose,
+            "timestamp": self.timestamp.isoformat(),
+            "duration_ms": self.duration_ms,
+            "data_elements_accessed": self.data_elements_accessed,
+            "business_justification": self.business_justification,
+            "approval_required": self.approval_required,
+            "approved_by": self.approved_by,
+            "approval_timestamp": (
+                self.approval_timestamp.isoformat() if self.approval_timestamp else None
+            ),
+            "audit_trail_id": self.audit_trail_id,
+            "created_at": datetime.utcnow().isoformat(),
+            "ttl": int(
+                (datetime.utcnow().timestamp()) + (7 * 365 * 24 * 60 * 60)
+            ),  # 7 years
         }
 
 
 @dataclass
 class DataAccessPattern:
     """Pattern analysis for detecting anomalous access"""
+
     user_id: str
     customer_id: Optional[str]
     pattern_type: str
@@ -220,23 +232,25 @@ class DataAccessPattern:
     timestamp: datetime
     suspicious: bool = False
     investigated: bool = False
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage"""
         return {
-            'pattern_id': str(uuid.uuid4()),
-            'user_id': self.user_id,
-            'customer_id': self.customer_id,
-            'pattern_type': self.pattern_type,
-            'frequency': self.frequency,
-            'time_window': self.time_window,
-            'baseline_frequency': self.baseline_frequency,
-            'deviation_score': self.deviation_score,
-            'timestamp': self.timestamp.isoformat(),
-            'suspicious': self.suspicious,
-            'investigated': self.investigated,
-            'created_at': datetime.utcnow().isoformat(),
-            'ttl': int((datetime.utcnow().timestamp()) + (90 * 24 * 60 * 60))  # 90 days
+            "pattern_id": str(uuid.uuid4()),
+            "user_id": self.user_id,
+            "customer_id": self.customer_id,
+            "pattern_type": self.pattern_type,
+            "frequency": self.frequency,
+            "time_window": self.time_window,
+            "baseline_frequency": self.baseline_frequency,
+            "deviation_score": self.deviation_score,
+            "timestamp": self.timestamp.isoformat(),
+            "suspicious": self.suspicious,
+            "investigated": self.investigated,
+            "created_at": datetime.utcnow().isoformat(),
+            "ttl": int(
+                (datetime.utcnow().timestamp()) + (90 * 24 * 60 * 60)
+            ),  # 90 days
         }
 
 
