@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Footer from './Footer';
 import {
   HomeIcon,
   DocumentMagnifyingGlassIcon,
@@ -31,7 +32,7 @@ const Layout = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
@@ -139,11 +140,14 @@ const Layout = () => {
         </div>
 
         {/* Page content */}
-        <main className="py-6">
+        <main className="py-6 flex-1">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <Outlet />
           </div>
         </main>
+        
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );

@@ -4,17 +4,13 @@ from datetime import datetime
 from typing import Optional
 
 import boto3
+from core.auth import get_current_user
+from core.config import settings
+from core.version import get_api_version, get_full_version_info
 from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from mangum import Mangum
-
-
-# Version update to test deployment pipeline
-__version__ = "1.0.1"
-
-from core.auth import get_current_user
-from core.config import settings
 from models.subscription import (
     BillingInterval,
     PlanTier,
@@ -27,6 +23,9 @@ from services.compliance_service import ComplianceService
 from services.gcp_service import GCPAssetService
 from services.stripe_service import StripeService
 
+
+# Version is now managed via version.json and core/version.py
+__version__ = get_api_version()
 
 app = FastAPI(
     title="ThemisGuard HIPAA Compliance API",
@@ -104,6 +103,15 @@ async def health_check():
         health_details["services"]["s3"] = f"error: {str(e)}"
 
     return health_details
+
+
+@app.get("/version")
+async def get_version():
+    """Get API version information"""
+    print("📋 Version endpoint accessed")
+    version_info = get_full_version_info()
+    print(f"🏷️ API Version: {version_info.get('api_version')}")
+    return version_info
 
 
 @app.get("/debug")

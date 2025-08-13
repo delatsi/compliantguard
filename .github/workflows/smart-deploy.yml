@@ -57,9 +57,11 @@ jobs:
             - 'template.yaml'
             - 'samconfig.toml'
             - 'requirements.txt'
+            - 'version.json'
           frontend:
             - 'frontend/**'
             - 'frontend-template.yaml'
+            - 'version.json'
           infrastructure:
             - 'template.yaml'
             - 'frontend-template.yaml'
@@ -352,7 +354,12 @@ jobs:
         GOOGLE_CLIENT_ID="${{ needs.detect-changes.outputs.environment == 'dev' && secrets.GOOGLE_CLIENT_ID_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.GOOGLE_CLIENT_ID_STAGING || secrets.GOOGLE_CLIENT_ID_PROD }}"
         
         # Build parameter overrides - only include GoogleClientId if it's not empty
+        DEPLOYMENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         PARAM_OVERRIDES="Environment=$ENVIRONMENT ProjectName=themisguard Version=${{ github.sha }} Branch=${{ github.ref_name }}"
+        
+        # Set environment variables for Lambda function
+        export GITHUB_SHA="${{ github.sha }}"
+        export DEPLOYMENT_TIME="$DEPLOYMENT_TIME"
         if [[ -n "$GOOGLE_CLIENT_ID" ]]; then
           PARAM_OVERRIDES="$PARAM_OVERRIDES GoogleClientId=$GOOGLE_CLIENT_ID"
         fi
@@ -508,9 +515,18 @@ jobs:
         fi
         
         echo "🔗 Building with API URL: $API_URL"
+        
+        # Read version from version.json
+        APP_VERSION=$(cat ../version.json | jq -r '.app_version // "1.2.0"')
+        API_VERSION=$(cat ../version.json | jq -r '.api_version // "1.2.0"')
+        BUILD_DATE=$(date -u +"%Y-%m-%d")
+        
         echo "VITE_API_URL=$API_URL" > .env.production
         echo "VITE_ENVIRONMENT=${{ needs.detect-changes.outputs.environment }}" >> .env.production
         echo "VITE_VERSION=${{ github.sha }}" >> .env.production
+        echo "VITE_APP_VERSION=$APP_VERSION" >> .env.production
+        echo "VITE_API_VERSION=$API_VERSION" >> .env.production
+        echo "VITE_BUILD_DATE=$BUILD_DATE" >> .env.production
         
         echo "🏗️ Building frontend..."
         npm run build
@@ -630,9 +646,18 @@ jobs:
         npm ci
         
         echo "🏗️ Building frontend..."
+        
+        # Read version from version.json
+        APP_VERSION=$(cat ../version.json | jq -r '.app_version // "1.2.0"')
+        API_VERSION=$(cat ../version.json | jq -r '.api_version // "1.2.0"')
+        BUILD_DATE=$(date -u +"%Y-%m-%d")
+        
         echo "VITE_API_URL=${{ steps.get-api-url.outputs.api_url }}" > .env.production
         echo "VITE_ENVIRONMENT=${{ needs.detect-changes.outputs.environment }}" >> .env.production
         echo "VITE_VERSION=${{ github.sha }}" >> .env.production
+        echo "VITE_APP_VERSION=$APP_VERSION" >> .env.production
+        echo "VITE_API_VERSION=$API_VERSION" >> .env.production
+        echo "VITE_BUILD_DATE=$BUILD_DATE" >> .env.production
         npm run build
         
         echo "📤 Deploying frontend..."
