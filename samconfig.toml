@@ -62,13 +62,9 @@ parameter_overrides = [
     "Environment=staging",
     "ProjectName=themisguard",
     "JWTSecretKey=your-secret-key-change-in-production",
-    "GCPProjectId=",
-    "GoogleClientId=",
     "StripeSecretKey=sk_test_...",
     "StripePublishableKey=pk_test_...",
-    "StripeWebhookSecret=whsec_...",
-    "CustomDomainName=",
-    "SSLCertificateArn="
+    "StripeWebhookSecret=whsec_..."
 ]
 
 [prod]

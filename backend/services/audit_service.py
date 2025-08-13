@@ -2,13 +2,12 @@
 Comprehensive Audit Service - Complete audit logging and monitoring system
 """
 
-import asyncio
 import hashlib
 import json
 import uuid
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import boto3
 
@@ -320,14 +319,6 @@ class AuditService:
         """Generate compliance audit report"""
 
         try:
-            # Get compliance events
-            compliance_events = await self.get_audit_trail(
-                customer_id=customer_id,
-                start_time=start_date,
-                end_time=end_date,
-                event_type=EventType.PHI_ACCESS,
-            )
-
             # Get all access events
             all_events = await self.get_audit_trail(
                 customer_id=customer_id, start_time=start_date, end_time=end_date
@@ -405,8 +396,8 @@ class AuditService:
 
     async def _check_access_patterns(self, event: AuditEvent):
         """Check for anomalous access patterns"""
-        # Run pattern detection for the user
-        patterns = await self.detect_anomalous_patterns(event.user_id, hours=1)
+        # Run pattern detection for the user (results used internally by security event detection)
+        await self.detect_anomalous_patterns(event.user_id, hours=1)
 
         # Check for immediate red flags
         if event.result == AccessResult.DENIED:

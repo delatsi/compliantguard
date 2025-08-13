@@ -1,19 +1,15 @@
 import hashlib
-import json
 import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import boto3
 import pyotp
-from botocore.exceptions import ClientError
 
 from ..core.config import settings
 from ..models.admin import (
     AdminAuditLog,
     AdminDashboardData,
-    AdminPermission,
-    AdminRole,
     AdminSession,
     AdminUser,
     ChurnAnalytics,

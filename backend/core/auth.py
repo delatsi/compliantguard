@@ -4,10 +4,11 @@ from typing import Any, Dict, Optional
 import boto3
 from botocore.exceptions import ClientError
 from core.config import settings
-from fastapi import Depends, HTTPException, Security
+from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
 
 security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -89,5 +90,5 @@ async def get_current_user(
 
         return user
 
-    except ClientError as e:
+    except ClientError:
         raise HTTPException(status_code=500, detail="Database error")

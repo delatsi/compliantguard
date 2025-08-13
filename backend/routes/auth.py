@@ -14,6 +14,7 @@ from core.config import settings
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
+
 router = APIRouter()
 
 # DynamoDB client
@@ -59,7 +60,7 @@ async def register_user(user_data: UserRegistration):
                 raise HTTPException(
                     status_code=400, detail="User with this email already exists"
                 )
-            print(f"✅ User does not exist, proceeding with registration")
+            print("✅ User does not exist, proceeding with registration")
         except ClientError as e:
             print(
                 f"❌ DynamoDB ClientError: {e.response['Error']['Code']} - {e.response['Error']['Message']}"
@@ -75,7 +76,7 @@ async def register_user(user_data: UserRegistration):
         print(f"🆔 Generated user ID: {user_id}")
 
         hashed_password = get_password_hash(user_data.password)
-        print(f"🔐 Password hashed successfully")
+        print("🔐 Password hashed successfully")
 
         user_item = {
             "user_id": user_id,
@@ -99,7 +100,7 @@ async def register_user(user_data: UserRegistration):
 
         # Store in DynamoDB
         users_table.put_item(Item=user_item)
-        print(f"✅ User stored successfully in DynamoDB")
+        print("✅ User stored successfully in DynamoDB")
 
         # Create access token
         token_data = {"sub": user_id, "email": user_data.email}
@@ -134,7 +135,7 @@ async def login_user(login_data: UserLogin):
     try:
         # Get user from DynamoDB (using email as lookup)
         print(f"🔍 Scanning DynamoDB for user: {login_data.email}")
-        print(f"📊 Filter expression: email = :email")
+        print("📊 Filter expression: email = :email")
 
         response = users_table.scan(
             FilterExpression="email = :email",
@@ -156,18 +157,18 @@ async def login_user(login_data: UserLogin):
         print(f"🔐 Has password hash: {'password_hash' in user}")
 
         # Verify password
-        print(f"🔐 Verifying password...")
+        print("🔐 Verifying password...")
         if not verify_password(login_data.password, user["password_hash"]):
             print(f"❌ Password verification failed for: {login_data.email}")
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        print(f"✅ Password verified successfully")
+        print("✅ Password verified successfully")
 
         # Create access token
-        print(f"🎫 Creating access token...")
+        print("🎫 Creating access token...")
         token_data = {"sub": user["user_id"], "email": user["email"]}
         access_token = create_access_token(token_data)
-        print(f"✅ Access token created")
+        print("✅ Access token created")
 
         user_response = {
             "user_id": user["user_id"],
@@ -227,7 +228,7 @@ async def google_sso_login(google_data: GoogleSSOData):
             print(f"🔍 New Google ID: {google_data.google_id}")
 
             if user.get("google_id") != google_data.google_id:
-                print(f"🔄 Updating Google ID for user")
+                print("🔄 Updating Google ID for user")
                 users_table.update_item(
                     Key={"user_id": user["user_id"]},
                     UpdateExpression="SET google_id = :google_id, updated_at = :updated_at",
@@ -236,12 +237,12 @@ async def google_sso_login(google_data: GoogleSSOData):
                         ":updated_at": datetime.utcnow().isoformat(),
                     },
                 )
-                print(f"✅ Google ID updated successfully")
+                print("✅ Google ID updated successfully")
             else:
-                print(f"ℹ️ Google ID already up to date")
+                print("ℹ️ Google ID already up to date")
         else:
             # New user - create from Google data
-            print(f"👤 Creating new user from Google data")
+            print("👤 Creating new user from Google data")
             user_id = str(uuid.uuid4())
             print(f"🆔 Generated user ID: {user_id}")
 
@@ -267,16 +268,16 @@ async def google_sso_login(google_data: GoogleSSOData):
                 "status": "active",
             }
 
-            print(f"💾 Storing new user in DynamoDB")
+            print("💾 Storing new user in DynamoDB")
             print(f"📝 User item keys: {list(user.keys())}")
             users_table.put_item(Item=user)
-            print(f"✅ New user created successfully")
+            print("✅ New user created successfully")
 
         # Create access token
         print(f"🎫 Creating access token for: {user['email']}")
         token_data = {"sub": user["user_id"], "email": user["email"]}
         access_token = create_access_token(token_data)
-        print(f"✅ Access token created")
+        print("✅ Access token created")
 
         user_response = {
             "user_id": user["user_id"],
@@ -309,7 +310,7 @@ async def google_sso_login(google_data: GoogleSSOData):
 @router.get("/verify")
 async def verify_token(current_user: dict = Depends(get_current_user)):
     """Verify JWT token and return user info"""
-    print(f"🔍 Token verification request")
+    print("🔍 Token verification request")
     print(f"👤 Current user ID: {current_user.get('user_id', 'unknown')}")
     print(f"📧 Current user email: {current_user.get('email', 'unknown')}")
     print(f"📝 User data keys: {list(current_user.keys())}")
@@ -321,7 +322,7 @@ async def verify_token(current_user: dict = Depends(get_current_user)):
         "plan_tier": current_user.get("plan_tier", "free"),
     }
 
-    print(f"✅ Token verification successful")
+    print("✅ Token verification successful")
     print(f"👤 Returning user data: {list(user_response.keys())}")
 
     return {"user": user_response}

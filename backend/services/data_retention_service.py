@@ -2,11 +2,9 @@
 Data Retention and Deletion Service - HIPAA compliant data lifecycle management
 """
 
-import asyncio
-import json
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import boto3
 

@@ -139,15 +139,15 @@ jobs:
         cd backend
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov pytest-asyncio flake8 black isort
+        pip install pytest pytest-cov pytest-asyncio ruff
 
     - name: Run linting and formatting checks
       run: |
         cd backend
-        echo "🔍 Running linting checks..."
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        black --check . --diff
-        isort --check-only . --diff
+        echo "🚀 Running ruff check (linting)..."
+        ruff check . --output-format=github
+        echo "🎨 Running ruff format (formatting)..."
+        ruff format . --check
 
     - name: Run tests with coverage
       run: |
@@ -305,17 +305,20 @@ jobs:
         echo "📊 Current stack status: $STACK_STATUS"
         
         # Deploy using stable stack name (idempotent)
+        GOOGLE_CLIENT_ID="${{ needs.detect-changes.outputs.environment == 'dev' && secrets.GOOGLE_CLIENT_ID_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.GOOGLE_CLIENT_ID_STAGING || secrets.GOOGLE_CLIENT_ID_PROD }}"
+        
+        # Build parameter overrides - only include GoogleClientId if it's not empty
+        PARAM_OVERRIDES="Environment=$ENVIRONMENT ProjectName=themisguard Version=${{ github.sha }} Branch=${{ github.ref_name }}"
+        if [[ -n "$GOOGLE_CLIENT_ID" ]]; then
+          PARAM_OVERRIDES="$PARAM_OVERRIDES GoogleClientId=$GOOGLE_CLIENT_ID"
+        fi
+        
         sam deploy \
           --config-env "$ENVIRONMENT" \
           --stack-name "$STACK_NAME" \
           --no-confirm-changeset \
           --no-fail-on-empty-changeset \
-          --parameter-overrides \
-            Environment="$ENVIRONMENT" \
-            ProjectName=themisguard \
-            Version="${{ github.sha }}" \
-            Branch="${{ github.ref_name }}" \
-            GoogleClientId="${{ needs.detect-changes.outputs.environment == 'dev' && secrets.GOOGLE_CLIENT_ID_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.GOOGLE_CLIENT_ID_STAGING || secrets.GOOGLE_CLIENT_ID_PROD }}"
+          --parameter-overrides $PARAM_OVERRIDES
         
         echo "stack_name=$STACK_NAME" >> $GITHUB_OUTPUT
         echo "✅ Backend deployment completed successfully"

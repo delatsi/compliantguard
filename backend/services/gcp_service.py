@@ -1,4 +1,3 @@
-import os
 from typing import Any, Dict, List
 
 from google.cloud import asset_v1

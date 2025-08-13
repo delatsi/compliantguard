@@ -1,26 +1,22 @@
 import json
-import os
 import sys
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 import boto3
-from botocore.exceptions import ClientError
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Security, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from mangum import Mangum
 
+
 # Version update to test deployment pipeline
 __version__ = "1.0.1"
 
-from core.auth import get_current_user, verify_token
+from core.auth import get_current_user
 from core.config import settings
-from models.admin import AdminDashboardData
-from models.compliance import ComplianceReport, ViolationSummary
 from models.subscription import (
     BillingInterval,
-    CustomerSubscription,
     PlanTier,
     SubscriptionChangeRequest,
 )
@@ -30,6 +26,7 @@ from services.admin_service import AdminService
 from services.compliance_service import ComplianceService
 from services.gcp_service import GCPAssetService
 from services.stripe_service import StripeService
+
 
 app = FastAPI(
     title="ThemisGuard HIPAA Compliance API",
@@ -129,8 +126,6 @@ async def debug_info():
 
     # Test each AWS service
     try:
-        import sys
-
         print("🐍 Python version:", sys.version)
         print("📦 Boto3 version:", boto3.__version__)
 
@@ -174,14 +169,14 @@ async def trigger_compliance_scan(
     project_id: str, current_user: dict = Depends(get_current_user)
 ):
     """Trigger a new compliance scan for a GCP project"""
-    print(f"🔍 Compliance scan request initiated")
+    print("🔍 Compliance scan request initiated")
     print(f"👤 User: {current_user.get('user_id')}")
     print(f"🎯 Project ID: {project_id}")
     print(f"🕰️ Timestamp: {datetime.utcnow().isoformat()}")
 
     try:
         # Check usage limits before running scan
-        print(f"📈 Checking usage limits...")
+        print("📈 Checking usage limits...")
         limits_check = await stripe_service.check_usage_limits(current_user["user_id"])
         print(f"📊 Limits check result: {limits_check}")
 
@@ -192,7 +187,7 @@ async def trigger_compliance_scan(
                 status_code=429, detail=f"Usage limit exceeded: {reason}"
             )
 
-        print(f"✅ Usage limits check passed")
+        print("✅ Usage limits check passed")
 
         # Get GCP assets
         print(f"🌐 Fetching GCP assets for project {project_id}...")
@@ -207,7 +202,7 @@ async def trigger_compliance_scan(
             print(f"📊 Asset types: {asset_types}")
 
         # Run compliance analysis
-        print(f"🔍 Running compliance analysis...")
+        print("🔍 Running compliance analysis...")
         violations = await compliance_service.analyze_violations(assets)
         print(f"⚠️ Found {len(violations) if violations else 0} violations")
 
@@ -220,7 +215,7 @@ async def trigger_compliance_scan(
             print(f"📊 Violations by severity: {severity_counts}")
 
         # Store results (includes usage tracking)
-        print(f"💾 Storing scan results...")
+        print("💾 Storing scan results...")
         scan_id = await compliance_service.store_scan_results(
             user_id=current_user["user_id"],
             project_id=project_id,
@@ -235,7 +230,7 @@ async def trigger_compliance_scan(
             "status": "completed",
         }
 
-        print(f"🎉 Compliance scan completed successfully")
+        print("🎉 Compliance scan completed successfully")
         print(f"📊 Final response: {response_data}")
 
         return response_data
@@ -254,18 +249,18 @@ async def get_compliance_report(
     scan_id: str, current_user: dict = Depends(get_current_user)
 ):
     """Get compliance report for a specific scan"""
-    print(f"📄 Compliance report request")
+    print("📄 Compliance report request")
     print(f"👤 User: {current_user.get('user_id')}")
     print(f"🆔 Scan ID: {scan_id}")
 
     try:
-        print(f"🔍 Fetching scan report via service...")
+        print("🔍 Fetching scan report via service...")
         report = await compliance_service.get_scan_report(
             scan_id, current_user["user_id"]
         )
 
         if report:
-            print(f"✅ Report found")
+            print("✅ Report found")
             print(
                 f"📊 Report keys: {list(report.keys()) if isinstance(report, dict) else 'Not a dict'}"
             )
@@ -284,7 +279,7 @@ async def get_compliance_report(
         else:
             print(f"❌ No report found for scan ID: {scan_id}")
 
-        print(f"👤 Returning compliance report")
+        print("👤 Returning compliance report")
         return report
 
     except Exception as e:
@@ -298,12 +293,12 @@ async def list_reports(
     current_user: dict = Depends(get_current_user), limit: int = 10, offset: int = 0
 ):
     """List all compliance reports for the current user"""
-    print(f"📋 List reports request")
+    print("📋 List reports request")
     print(f"👤 User: {current_user.get('user_id')}")
     print(f"📊 Limit: {limit}, Offset: {offset}")
 
     try:
-        print(f"🔍 Fetching user reports via service...")
+        print("🔍 Fetching user reports via service...")
         reports = await compliance_service.list_user_reports(
             current_user["user_id"], limit, offset
         )
@@ -325,7 +320,7 @@ async def list_reports(
                         else 0
                     )
                     print(
-                        f"📊 Report {i+1}: {project_id} (scan: {scan_id[:8]}...) - {violations_count} violations"
+                        f"📊 Report {i + 1}: {project_id} (scan: {scan_id[:8]}...) - {violations_count} violations"
                     )
 
         print(f"👤 Returning {len(reports) if reports else 0} reports")
@@ -340,17 +335,17 @@ async def list_reports(
 @app.get("/api/v1/dashboard")
 async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
     """Get dashboard summary data"""
-    print(f"📊 Dashboard data request")
+    print("📊 Dashboard data request")
     print(f"👤 User: {current_user.get('user_id')}")
 
     try:
-        print(f"🔍 Fetching dashboard summary via service...")
+        print("🔍 Fetching dashboard summary via service...")
         dashboard_data = await compliance_service.get_dashboard_summary(
             current_user["user_id"]
         )
 
         if dashboard_data:
-            print(f"✅ Dashboard data retrieved")
+            print("✅ Dashboard data retrieved")
             print(
                 f"📊 Dashboard keys: {list(dashboard_data.keys()) if isinstance(dashboard_data, dict) else 'Not a dict'}"
             )
@@ -364,9 +359,9 @@ async def get_dashboard_data(current_user: dict = Depends(get_current_user)):
                     f"📊 Summary: {total_scans} scans, {total_violations} violations, {active_projects} projects"
                 )
         else:
-            print(f"⚠️ No dashboard data returned")
+            print("⚠️ No dashboard data returned")
 
-        print(f"👤 Returning dashboard data")
+        print("👤 Returning dashboard data")
         return dashboard_data
 
     except Exception as e:
@@ -390,15 +385,15 @@ async def verify_admin_token(
 @app.post("/api/admin/v1/login")
 async def admin_login(email: str, password: str):
     """Admin login - step 1 (before 2FA)"""
-    print(f"🔑 Admin login attempt")
+    print("🔑 Admin login attempt")
     print(f"📧 Admin email: {email}")
     print(f"🔐 Has password: {bool(password)}")
 
     try:
-        print(f"🔍 Authenticating admin via service...")
+        print("🔍 Authenticating admin via service...")
         result = await admin_service.authenticate_admin(email, password)
 
-        print(f"✅ Admin authentication step 1 completed")
+        print("✅ Admin authentication step 1 completed")
         print(
             f"📊 Auth result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
         )
@@ -425,7 +420,7 @@ async def admin_verify_2fa(
             temp_token, totp_code, ip_address, user_agent
         )
         return result
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="2FA verification failed")
 
 
@@ -466,7 +461,7 @@ async def admin_logout(
         session_token = credentials.credentials
         await admin_service.logout_admin(session_token, admin_user.admin_id)
         return {"message": "Logged out successfully"}
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Logout failed")
 
 
@@ -487,10 +482,10 @@ async def get_admin_audit_logs(admin_user=Depends(verify_admin_token), limit: in
 @app.get("/api/v1/billing/plans")
 async def get_pricing_plans():
     """Get available pricing plans"""
-    print(f"💳 Pricing plans request")
+    print("💳 Pricing plans request")
 
     try:
-        print(f"🔍 Fetching available plans via Stripe service...")
+        print("🔍 Fetching available plans via Stripe service...")
         plans = stripe_service.get_available_plans()
 
         print(f"✅ Found {len(plans) if plans else 0} pricing plans")

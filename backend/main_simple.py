@@ -3,10 +3,10 @@ import hashlib
 import hmac
 import json
 import os
-import uuid
 from datetime import datetime, timedelta
 
 import boto3
+
 
 # Initialize DynamoDB
 dynamodb = boto3.resource("dynamodb")
@@ -166,7 +166,7 @@ def login_user(email, password):
 def handler(event, context):
     """Enhanced Lambda handler with user authentication"""
 
-    print(f"🏠 Enhanced API accessed")
+    print("🏠 Enhanced API accessed")
     print(f"🌍 Environment: {os.getenv('ENVIRONMENT', 'unknown')}")
     print(f"🕐 Timestamp: {datetime.utcnow().isoformat()}")
     print(f"📍 Region: {os.getenv('AWS_DEFAULT_REGION', 'unknown')}")
@@ -187,12 +187,12 @@ def handler(event, context):
         if body and body != "{}":
             try:
                 request_data = json.loads(body)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 pass
 
         # Route handling
         if path == "/health":
-            print(f"❤️ Health check endpoint accessed")
+            print("❤️ Health check endpoint accessed")
             response_body = {
                 "status": "healthy",
                 "timestamp": datetime.utcnow().isoformat(),
@@ -201,7 +201,7 @@ def handler(event, context):
             }
 
         elif path == "/create-test-user" and http_method == "POST":
-            print(f"👤 Creating test user...")
+            print("👤 Creating test user...")
             user = create_test_user()
             if user:
                 response_body = {
@@ -214,7 +214,7 @@ def handler(event, context):
                 response_body = {"error": "Failed to create test user"}
 
         elif path == "/login" and http_method == "POST":
-            print(f"🔑 Login attempt...")
+            print("🔑 Login attempt...")
             email = request_data.get("email", "")
             password = request_data.get("password", "")
 
@@ -240,7 +240,7 @@ def handler(event, context):
                 response_body = {"error": "Invalid credentials"}
 
         elif path == "/users" and http_method == "GET":
-            print(f"👥 Listing users...")
+            print("👥 Listing users...")
             # Require authentication
             auth_user = get_auth_user(event)
             if not auth_user:
@@ -270,7 +270,7 @@ def handler(event, context):
                 response_body = {"error": f"Failed to list users: {str(e)}"}
 
         elif path == "/gcp/credentials" and http_method == "POST":
-            print(f"🔑 GCP credential upload request...")
+            print("🔑 GCP credential upload request...")
             # Require authentication
             auth_user = get_auth_user(event)
             if not auth_user:
@@ -304,17 +304,7 @@ def handler(event, context):
                     credential_id = f"gcp-{user_id}-{project_id}"
 
                     # In a real implementation, you'd encrypt the service account JSON
-                    # For testing, we'll just store it directly
-                    gcp_credential = {
-                        "credential_id": credential_id,
-                        "user_id": user_id,
-                        "project_id": project_id,
-                        "service_account_json": json.dumps(service_account_json),
-                        "created_at": datetime.utcnow().isoformat(),
-                        "is_active": True,
-                    }
-
-                    # Note: In production, you'd create a separate GCP credentials table
+                    # and store it in a separate GCP credentials table
                     # For this test, we'll just return success
                     print(
                         f"✅ GCP credentials would be stored for project: {project_id}"
@@ -335,7 +325,7 @@ def handler(event, context):
                     }
 
         else:
-            print(f"🏠 Root/default endpoint accessed")
+            print("🏠 Root/default endpoint accessed")
             response_body = {
                 "message": "ThemisGuard HIPAA Compliance API - Enhanced Debug Version",
                 "version": "debug-2.0.0",
@@ -356,7 +346,7 @@ def handler(event, context):
                 },
             }
 
-        print(f"✅ Response prepared successfully")
+        print("✅ Response prepared successfully")
         print(f"📦 Response body: {json.dumps(response_body, indent=2)}")
 
         return {

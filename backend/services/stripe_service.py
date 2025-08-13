@@ -1,20 +1,15 @@
-import json
 import secrets
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 import boto3
 import stripe
-from botocore.exceptions import ClientError
 
 from ..core.config import settings
 from ..models.subscription import (
     THEMISGUARD_PLANS,
     BillingInterval,
-    BillingPortalSession,
     CustomerSubscription,
-    Invoice,
-    PaymentIntent,
     PlanTier,
     PricingPlan,
     SubscriptionChangeRequest,
@@ -331,7 +326,7 @@ class StripeService:
             if plan.scan_limit and usage["scans_count"] >= plan.scan_limit:
                 return {
                     "within_limits": False,
-                    "reason": f'Monthly scan limit exceeded ({usage["scans_count"]}/{plan.scan_limit})',
+                    "reason": f"Monthly scan limit exceeded ({usage['scans_count']}/{plan.scan_limit})",
                     "usage": usage,
                     "limits": {
                         "scans": plan.scan_limit,
@@ -343,7 +338,7 @@ class StripeService:
             if plan.project_limit and usage["projects_scanned"] >= plan.project_limit:
                 return {
                     "within_limits": False,
-                    "reason": f'Project limit exceeded ({usage["projects_scanned"]}/{plan.project_limit})',
+                    "reason": f"Project limit exceeded ({usage['projects_scanned']}/{plan.project_limit})",
                     "usage": usage,
                     "limits": {
                         "scans": plan.scan_limit,
@@ -372,15 +367,8 @@ class StripeService:
                 customer=subscription.stripe_customer_id, return_url=return_url
             )
 
-            # Store session info
-            portal_session = BillingPortalSession(
-                session_id=f"portal_{secrets.token_urlsafe(16)}",
-                customer_id=user_id,
-                stripe_session_id=session.id,
-                return_url=return_url,
-                expires_at=datetime.now() + timedelta(hours=1),
-            )
-
+            # Session info could be stored here if needed for tracking
+            # For now, we just return the portal URL directly
             return session.url
 
         except stripe.error.StripeError as e:

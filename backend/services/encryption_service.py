@@ -6,13 +6,11 @@ Provides customer-isolated encryption keys and data protection
 import base64
 import hashlib
 import json
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict
 
 import boto3
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from ..core.config import settings
 
@@ -306,7 +304,8 @@ class CustomerEncryptionService:
 
         # Schedule deletion of old key (after retention period)
         self.kms.schedule_key_deletion(
-            KeyId=current_key_id, PendingWindowInDays=30  # Minimum waiting period
+            KeyId=current_key_id,
+            PendingWindowInDays=30,  # Minimum waiting period
         )
 
         self._customer_key_id = new_key_id

@@ -2,7 +2,7 @@ import base64
 import json
 import uuid
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict
 
 import boto3
 import structlog
@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
 
 logger = structlog.get_logger()
 

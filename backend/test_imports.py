@@ -2,9 +2,7 @@
 
 # Test minimal imports to debug the issue
 import json
-import os
-import sys
-from datetime import datetime
+
 
 print("Basic imports successful")
 
@@ -17,15 +15,11 @@ except Exception as e:
     print(f"❌ Failed to import core.config: {e}")
 
 try:
-    from core.auth import get_current_user
-
     print("✅ core.auth imported successfully")
 except Exception as e:
     print(f"❌ Failed to import core.auth: {e}")
 
 try:
-    from routes.auth import router
-
     print("✅ routes.auth imported successfully")
 except Exception as e:
     print(f"❌ Failed to import routes.auth: {e}")

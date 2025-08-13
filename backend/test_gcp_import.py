@@ -3,12 +3,12 @@
 import sys
 import traceback
 
+
 print("Testing GCP router import...")
 print("=" * 50)
 
 try:
     print("1. Testing core imports...")
-    from fastapi import APIRouter
 
     print("✓ FastAPI imported")
 
@@ -26,11 +26,8 @@ except Exception as e:
 
 try:
     print("\n2. Testing Google Cloud imports...")
-    from google.oauth2 import service_account
 
     print("✓ google.oauth2.service_account imported")
-
-    from googleapiclient.discovery import build
 
     print("✓ googleapiclient.discovery imported")
 
@@ -42,7 +39,6 @@ except Exception as e:
 
 try:
     print("\n3. Testing GCP credential service...")
-    from services.gcp_credential_service import gcp_credential_service
 
     print("✓ GCP credential service imported")
 

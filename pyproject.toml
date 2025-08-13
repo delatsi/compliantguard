@@ -1,3 +1,36 @@
+[tool.ruff]
+target-version = "py38"
+line-length = 88
+exclude = [
+    ".aws-sam",
+    "venv",
+    ".venv", 
+    "node_modules",
+    "__pycache__",
+    ".git"
+]
+
+[tool.ruff.lint]
+# Enable pycodestyle (E), Pyflakes (F), and isort (I)
+select = ["E", "F", "I"]
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+    "E203",  # Whitespace before ':' (conflicts with formatter)
+]
+
+[tool.ruff.lint.isort]
+# Black-compatible isort settings
+combine-as-imports = true
+lines-after-imports = 2
+
+[tool.ruff.format]
+# Use ruff formatter (replaces Black)
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# Legacy tool configs for backward compatibility (will be removed once fully migrated)
 [tool.isort]
 profile = "black"
 line_length = 88

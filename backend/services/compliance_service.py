@@ -13,7 +13,6 @@ from ..models.compliance import (
     DashboardData,
     Violation,
     ViolationSeverity,
-    ViolationSummary,
     ViolationType,
 )
 

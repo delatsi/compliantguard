@@ -10,6 +10,7 @@ import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+
 app = FastAPI(title="GCP Test API")
 
 # Add CORS

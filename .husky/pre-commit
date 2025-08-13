@@ -3,15 +3,41 @@ set -e
 
 echo "🔍 Running pre-commit validation..."
 
-# Check if we're in frontend directory or project root
-if [ -f "frontend/package.json" ]; then
-  cd frontend
-elif [ ! -f "package.json" ]; then
-  echo "❌ No package.json found. Please run from project root or frontend directory."
+# Make sure we're in project root
+if [ ! -f "package.json" ] && [ ! -f "frontend/package.json" ]; then
+  echo "❌ Please run from project root directory."
   exit 1
 fi
 
-echo "📦 Installing dependencies if needed..."
+# Navigate to project root if needed
+if [ -f "frontend/package.json" ] && [ ! -f "package.json" ]; then
+  cd ..
+fi
+
+echo "🐍 Running backend linting..."
+if [ -d "backend" ] && [ -f "backend/main.py" ]; then
+  # Check if Python tools are available
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "❌ Python 3 not found. Please install Python 3."
+    exit 1
+  fi
+  
+  # Install Ruff if not available
+  python3 -m pip install --quiet ruff 2>/dev/null || echo "Installing Ruff..."
+  
+  echo "  🚀 Running ruff check (linting)..."
+  python3 -m ruff check backend/ --fix-only
+  
+  echo "  🎨 Running ruff format (formatting)..."
+  python3 -m ruff format backend/ --check
+  
+  echo "  ✅ Backend linting passed!"
+else
+  echo "  ⏭️  No backend directory found, skipping backend linting."
+fi
+
+echo "📦 Installing frontend dependencies if needed..."
+cd frontend
 npm ci --prefer-offline --no-audit
 
 echo "🧹 Running ESLint..."
@@ -23,4 +49,5 @@ npm run test:run
 echo "🏗️  Testing build..."
 npm run build
 
+cd ..
 echo "✅ All pre-commit checks passed!"

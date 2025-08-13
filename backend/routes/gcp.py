@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from services.gcp_credential_service import gcp_credential_service
 
+
 router = APIRouter()
 
 
@@ -42,14 +43,14 @@ async def upload_gcp_credentials(
     print(f"📧 Service account email: {service_account_email}")
 
     try:
-        print(f"💾 Storing credentials via service...")
+        print("💾 Storing credentials via service...")
         result = await gcp_credential_service.store_credentials(
             user_id=current_user["user_id"],
             project_id=credential_data.project_id,
             service_account_json=credential_data.service_account_json,
         )
 
-        print(f"✅ GCP credentials stored successfully")
+        print("✅ GCP credentials stored successfully")
         print(f"📊 Result keys: {list(result.keys())}")
 
         response_data = {
@@ -86,28 +87,28 @@ async def upload_gcp_credentials_file(
 
     try:
         # Validate file type
-        print(f"🔍 Validating file type...")
+        print("🔍 Validating file type...")
         if not file.filename.endswith(".json"):
             print(f"❌ Invalid file type: {file.filename}")
             raise HTTPException(status_code=400, detail="Only JSON files are allowed")
 
-        print(f"✅ File type validation passed")
+        print("✅ File type validation passed")
 
         # Read and parse JSON
-        print(f"📄 Reading file content...")
+        print("📄 Reading file content...")
         content = await file.read()
         print(f"📊 Content size: {len(content)} bytes")
 
         try:
             service_account_json = json.loads(content.decode("utf-8"))
-            print(f"✅ JSON parsed successfully")
+            print("✅ JSON parsed successfully")
             print(f"📝 JSON keys: {list(service_account_json.keys())}")
         except json.JSONDecodeError as json_err:
             print(f"❌ JSON decode error: {json_err}")
             raise HTTPException(status_code=400, detail="Invalid JSON file format")
 
         # Validate required fields
-        print(f"🔍 Validating required fields...")
+        print("🔍 Validating required fields...")
         required_fields = [
             "type",
             "project_id",
@@ -136,21 +137,21 @@ async def upload_gcp_credentials_file(
                 status_code=400, detail="File must be a service account key"
             )
 
-        print(f"✅ Service account validation passed")
+        print("✅ Service account validation passed")
         service_account_email = service_account_json.get("client_email", "unknown")
         json_project_id = service_account_json.get("project_id", "unknown")
         print(f"📧 Service account email: {service_account_email}")
         print(f"🎯 JSON project ID: {json_project_id}")
 
         # Store credentials
-        print(f"💾 Storing credentials via service...")
+        print("💾 Storing credentials via service...")
         result = await gcp_credential_service.store_credentials(
             user_id=current_user["user_id"],
             project_id=project_id,
             service_account_json=service_account_json,
         )
 
-        print(f"✅ GCP credentials file uploaded and stored successfully")
+        print("✅ GCP credentials file uploaded and stored successfully")
         print(f"📊 Result keys: {list(result.keys())}")
 
         response_data = {
@@ -179,7 +180,7 @@ async def list_gcp_projects(current_user: dict = Depends(get_current_user)):
     print(f"📋 List GCP projects request for user: {current_user.get('user_id')}")
 
     try:
-        print(f"🔍 Querying user projects via service...")
+        print("🔍 Querying user projects via service...")
         projects = await gcp_credential_service.list_user_projects(
             current_user["user_id"]
         )
@@ -188,10 +189,10 @@ async def list_gcp_projects(current_user: dict = Depends(get_current_user)):
         if projects:
             for i, project in enumerate(projects):
                 print(
-                    f"🎯 Project {i+1}: {project.get('project_id')} ({project.get('status')})"
+                    f"🎯 Project {i + 1}: {project.get('project_id')} ({project.get('status')})"
                 )
         else:
-            print(f"📎 No GCP projects configured for user")
+            print("📎 No GCP projects configured for user")
 
         print(f"👤 Returning {len(projects)} projects")
         return projects
@@ -209,17 +210,17 @@ async def revoke_gcp_credentials(
     """
     Revoke GCP credentials for a specific project
     """
-    print(f"🗑️ GCP credential revocation request")
+    print("🗑️ GCP credential revocation request")
     print(f"👤 User: {current_user.get('user_id')}")
     print(f"🎯 Project ID: {project_id}")
 
     try:
-        print(f"🔄 Revoking credentials via service...")
+        print("🔄 Revoking credentials via service...")
         result = await gcp_credential_service.revoke_credentials(
             user_id=current_user["user_id"], project_id=project_id
         )
 
-        print(f"✅ GCP credentials revoked successfully")
+        print("✅ GCP credentials revoked successfully")
         print(f"📊 Revocation result: {result}")
 
         response_data = {
@@ -227,7 +228,7 @@ async def revoke_gcp_credentials(
             "project_id": project_id,
         }
 
-        print(f"👤 Returning revocation confirmation")
+        print("👤 Returning revocation confirmation")
         return response_data
 
     except HTTPException as http_ex:
@@ -246,12 +247,12 @@ async def check_gcp_project_status(
     """
     Check the status of GCP credentials for a project
     """
-    print(f"🔍 GCP project status check")
+    print("🔍 GCP project status check")
     print(f"👤 User: {current_user.get('user_id')}")
     print(f"🎯 Project ID: {project_id}")
 
     try:
-        print(f"📋 Fetching user projects...")
+        print("📋 Fetching user projects...")
         projects = await gcp_credential_service.list_user_projects(
             current_user["user_id"]
         )
