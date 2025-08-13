@@ -10,6 +10,9 @@ from typing import Optional, List
 import boto3
 from botocore.exceptions import ClientError
 
+# Version update to test deployment pipeline
+__version__ = "1.0.1"
+
 from core.config import settings
 from core.auth import verify_token, get_current_user
 from routes.auth import router as auth_router
@@ -69,6 +72,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "environment": settings.ENVIRONMENT,
+        "version": __version__,
         "region": settings.AWS_REGION,
         "services": {}
     }

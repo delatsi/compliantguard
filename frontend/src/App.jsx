@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+// Version update to test deployment pipeline
+const APP_VERSION = '1.0.1';
 import { AuthProvider } from './contexts/AuthContext';
 import { DemoProvider } from './contexts/DemoContext';
 import { AdminProvider } from './contexts/AdminContext';
@@ -22,6 +25,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 
 function App() {
+  // Log version for debugging
+  console.log(`CompliantGuard Frontend v${APP_VERSION}`);
+  
   return (
     <AdminProvider>
       <DemoProvider>

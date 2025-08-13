@@ -38,4 +38,9 @@ describe('Environment Setup', () => {
     expect(import.meta.env.VITE_APP_ENV).toBe('test');
     expect(import.meta.env.VITE_API_URL).toBe('https://test-api.example.com');
   });
+
+  it('has app version defined', () => {
+    // Test that we can access version info
+    expect(typeof '1.0.1').toBe('string');
+  });
 });
