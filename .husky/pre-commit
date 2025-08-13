@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+
+echo "🔍 Running pre-commit validation..."
+
+# Check if we're in frontend directory or project root
+if [ -f "frontend/package.json" ]; then
+  cd frontend
+elif [ ! -f "package.json" ]; then
+  echo "❌ No package.json found. Please run from project root or frontend directory."
+  exit 1
+fi
+
+echo "📦 Installing dependencies if needed..."
+npm ci --prefer-offline --no-audit
+
+echo "🧹 Running ESLint..."
+npm run lint
+
+echo "🧪 Running tests..."
+npm run test:run
+
+echo "🏗️  Testing build..."
+npm run build
+
+echo "✅ All pre-commit checks passed!"

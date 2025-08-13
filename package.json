@@ -10,7 +10,12 @@
     "backend": "cd backend && source venv/bin/activate && python dev.py",
     "frontend": "cd frontend && npm run dev",
     "install-all": "cd backend && pip install -r requirements.txt && cd ../frontend && npm install",
-    "deploy": "sam build && sam deploy"
+    "deploy": "sam build && sam deploy",
+    "prepare": "husky",
+    "validate": "cd frontend && npm run lint && npm run test:run && npm run build",
+    "lint": "cd frontend && npm run lint",
+    "test": "cd frontend && npm run test:run",
+    "precommit": "npm run validate"
   },
   "keywords": [
     "hipaa",
@@ -21,5 +26,15 @@
     "react"
   ],
   "author": "ThemisGuard Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5"
+  },
+  "lint-staged": {
+    "frontend/**/*.{js,jsx}": [
+      "cd frontend && npm run lint --",
+      "cd frontend && npm run test:run --passWithNoTests"
+    ]
+  }
 }

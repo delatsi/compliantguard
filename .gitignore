@@ -73,3 +73,6 @@ yarn-error.log*
 # Build outputs
 frontend/dist/
 frontend/build/
+
+# Husky internals (commit the hooks, not the internals)
+.husky/_
