@@ -13,7 +13,7 @@ Globals:
         DYNAMODB_TABLE_NAME: !Sub "${ProjectName}-${Environment}-scans"
         S3_BUCKET_NAME: !Sub "${ProjectName}-${Environment}-reports"
         GCP_CREDENTIALS_TABLE: !Sub "${ProjectName}-${Environment}-gcp-credentials"
-        KMS_KEY_ALIAS: "alias/compliantguard-gcp-credentials"
+        KMS_KEY_ALIAS: !Sub "alias/${ProjectName}-${Environment}-gcp-credentials"
         JWT_SECRET_KEY: !Ref JWTSecretKey
         GCP_PROJECT_ID: !Ref GCPProjectId
         GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
@@ -156,7 +156,7 @@ Resources:
                 - kms:GenerateDataKey*
                 - kms:DescribeKey
               Resource: 
-                - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/compliantguard-gcp-credentials"
+                - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/${ProjectName}-${Environment}-gcp-credentials"
       Tags:
         Environment: !Ref Environment
         Project: !Ref ProjectName
@@ -276,7 +276,7 @@ Resources:
             ProjectionType: ALL
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
-      DeletionProtectionEnabled: true
+      DeletionProtectionEnabled: !If [IsProduction, true, false]
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
       Tags:
@@ -349,7 +349,7 @@ Resources:
             ProjectionType: ALL
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
-      DeletionProtectionEnabled: true
+      DeletionProtectionEnabled: !If [IsProduction, true, false]
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
 
@@ -557,6 +557,7 @@ Resources:
         PointInTimeRecoveryEnabled: true
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
         KMSMasterKeyId: !Ref GCPCredentialsKMSKey
       DeletionProtectionEnabled: !If [IsProduction, true, false]
       StreamSpecification:
@@ -775,7 +776,7 @@ Resources:
   GCPCredentialsKMSKeyAlias:
     Type: AWS::KMS::Alias
     Properties:
-      AliasName: alias/compliantguard-gcp-credentials
+      AliasName: !Sub "alias/${ProjectName}-${Environment}-gcp-credentials"
       TargetKeyId: !Ref GCPCredentialsKMSKey
 
 Conditions:

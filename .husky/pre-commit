@@ -22,14 +22,20 @@ if [ -d "backend" ] && [ -f "backend/main.py" ]; then
     exit 1
   fi
   
-  # Install Ruff if not available
-  python3 -m pip install --quiet ruff 2>/dev/null || echo "Installing Ruff..."
+  # Use backend virtual environment if available
+  if [ -f "backend/venv/bin/activate" ]; then
+    echo "  🔧 Using backend virtual environment..."
+    source backend/venv/bin/activate
+  else
+    # Install Ruff if not available
+    python3 -m pip install --quiet ruff 2>/dev/null || echo "Installing Ruff..."
+  fi
   
   echo "  🚀 Running ruff check (linting)..."
-  python3 -m ruff check backend/ --fix-only
+  ruff check backend/ --fix-only
   
   echo "  🎨 Running ruff format (formatting)..."
-  python3 -m ruff format backend/ --check
+  ruff format backend/ --check
   
   echo "  ✅ Backend linting passed!"
 else
