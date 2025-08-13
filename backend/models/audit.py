@@ -2,11 +2,11 @@
 Audit Models - Data structures for comprehensive audit logging
 """
 
+import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass
-import uuid
+from typing import Any, Dict, List, Optional
 
 
 class AccessResult(Enum):

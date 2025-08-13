@@ -1,20 +1,21 @@
-import boto3
 import json
 import subprocess
 import uuid
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import boto3
 from botocore.exceptions import ClientError
 
+from ..core.config import settings
 from ..models.compliance import (
     ComplianceReport,
+    DashboardData,
     Violation,
     ViolationSeverity,
-    ViolationType,
-    DashboardData,
     ViolationSummary,
+    ViolationType,
 )
-from ..core.config import settings
 
 
 class ComplianceService:

@@ -5,9 +5,11 @@ Simple GCP API Test Script (without complex dependencies)
 import json
 import os
 import sys
-import requests
 import time
 from pathlib import Path
+
+import requests
+
 
 def log_info(message):
     print(f"✅ {message}")

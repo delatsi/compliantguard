@@ -4,9 +4,10 @@ Standalone test script to verify GCP endpoints work
 Run this to test the GCP functionality independently
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 import json
+
 import uvicorn
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="GCP Test API")

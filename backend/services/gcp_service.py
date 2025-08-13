@@ -1,8 +1,9 @@
+import os
+from typing import Any, Dict, List
+
 from google.cloud import asset_v1
 from google.oauth2 import service_account
 from google.protobuf.json_format import MessageToDict
-from typing import Dict, Any, List
-import os
 
 from ..core.config import settings
 

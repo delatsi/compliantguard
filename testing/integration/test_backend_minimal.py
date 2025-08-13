@@ -15,16 +15,17 @@ os.environ['JWT_SECRET_KEY'] = 'test-secret-key-for-local-development'
 os.environ['ENVIRONMENT'] = 'test'
 
 try:
-    from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
-    from fastapi.middleware.cors import CORSMiddleware
-    import uvicorn
-    from pydantic import BaseModel
-    from typing import Dict, List, Optional
-    import boto3
     import base64
     import uuid
     from datetime import datetime
+    from typing import Dict, List, Optional
+
+    import boto3
+    import uvicorn
     from botocore.exceptions import ClientError
+    from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
 except ImportError as e:
     print(f"❌ Missing dependency: {e}")
     print("Please install: pip install fastapi uvicorn boto3 pydantic")

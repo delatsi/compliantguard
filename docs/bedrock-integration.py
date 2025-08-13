@@ -3,14 +3,15 @@ AWS Bedrock Integration for Automated Security Documentation Generation
 Supports various AI models for generating comprehensive security documents
 """
 
-import boto3
-import json
 import asyncio
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from enum import Enum
+import json
 import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import boto3
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

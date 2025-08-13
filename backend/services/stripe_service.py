@@ -1,26 +1,27 @@
-import stripe
-import boto3
 import json
 import secrets
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import boto3
+import stripe
 from botocore.exceptions import ClientError
 
-from ..models.subscription import (
-    CustomerSubscription,
-    PricingPlan,
-    UsageRecord,
-    PaymentIntent,
-    Invoice,
-    WebhookEvent,
-    SubscriptionStatus,
-    PlanTier,
-    BillingInterval,
-    THEMISGUARD_PLANS,
-    SubscriptionChangeRequest,
-    BillingPortalSession,
-)
 from ..core.config import settings
+from ..models.subscription import (
+    THEMISGUARD_PLANS,
+    BillingInterval,
+    BillingPortalSession,
+    CustomerSubscription,
+    Invoice,
+    PaymentIntent,
+    PlanTier,
+    PricingPlan,
+    SubscriptionChangeRequest,
+    SubscriptionStatus,
+    UsageRecord,
+    WebhookEvent,
+)
 
 
 class StripeService:

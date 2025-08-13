@@ -4,10 +4,11 @@ Analyze and categorize the 290 infrastructure violations
 """
 
 import json
+import re
 import subprocess
 import sys
-from collections import defaultdict, Counter
-import re
+from collections import Counter, defaultdict
+
 
 def get_raw_violations():
     """Get raw violations from each OPA namespace"""

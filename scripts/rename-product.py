@@ -17,15 +17,16 @@ Features:
 - Rollback capability
 """
 
+import argparse
+import json
 import os
 import re
-import argparse
 import shutil
-import json
-from pathlib import Path
-from typing import List, Dict, Tuple
 import subprocess
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Tuple
+
 
 class ProductRenamer:
     def __init__(self, old_name: str, new_name: str, dry_run: bool = False):

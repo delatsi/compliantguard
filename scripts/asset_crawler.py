@@ -1,8 +1,9 @@
+import json
+import os
+
 from google.cloud import asset_v1
 from google.oauth2 import service_account
 from google.protobuf.json_format import MessageToDict
-import os
-import json
 
 PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 CREDS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")

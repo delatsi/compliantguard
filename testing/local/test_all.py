@@ -3,9 +3,10 @@
 Test Simple Authentication Server - Zero Dependencies
 """
 import json
-import urllib.request
-import urllib.parse
 import urllib.error
+import urllib.parse
+import urllib.request
+
 
 def make_request(url, data=None, headers=None, method='GET'):
     """Make HTTP request with proper error handling"""

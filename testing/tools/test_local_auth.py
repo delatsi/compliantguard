@@ -2,11 +2,12 @@
 """
 Test Local Authentication and GCP Integration
 """
-import json
-import urllib.request
-import urllib.parse
-import urllib.error
 import base64
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+
 
 def make_request(url, data=None, headers=None, method='GET'):
     """Make HTTP request with proper error handling"""

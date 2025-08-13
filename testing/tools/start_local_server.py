@@ -22,10 +22,10 @@ try:
     import uvicorn
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    
+
     # Import your backend app
     from backend.main import app
-    
+
     # Add development-friendly middleware
     app.add_middleware(
         CORSMiddleware,

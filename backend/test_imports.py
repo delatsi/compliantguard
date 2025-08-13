@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 # Test minimal imports to debug the issue
+import json
 import os
 import sys
-import json
 from datetime import datetime
 
 print("Basic imports successful")

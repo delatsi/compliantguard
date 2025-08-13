@@ -3,12 +3,13 @@ Customer-Specific Encryption Service
 Provides customer-isolated encryption keys and data protection
 """
 
-import boto3
-import json
 import base64
 import hashlib
+import json
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+import boto3
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC

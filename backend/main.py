@@ -1,33 +1,34 @@
-from fastapi import FastAPI, HTTPException, Depends, Security, UploadFile, File, Form
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.cors import CORSMiddleware
-from mangum import Mangum
-import os
 import json
+import os
 import sys
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 import boto3
 from botocore.exceptions import ClientError
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Security, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from mangum import Mangum
 
 # Version update to test deployment pipeline
 __version__ = "1.0.1"
 
+from core.auth import get_current_user, verify_token
 from core.config import settings
-from core.auth import verify_token, get_current_user
+from models.admin import AdminDashboardData
+from models.compliance import ComplianceReport, ViolationSummary
+from models.subscription import (
+    BillingInterval,
+    CustomerSubscription,
+    PlanTier,
+    SubscriptionChangeRequest,
+)
 from routes.auth import router as auth_router
 from routes.gcp import router as gcp_router
-from models.compliance import ComplianceReport, ViolationSummary
-from models.admin import AdminDashboardData
-from models.subscription import (
-    CustomerSubscription,
-    SubscriptionChangeRequest,
-    PlanTier,
-    BillingInterval,
-)
+from services.admin_service import AdminService
 from services.compliance_service import ComplianceService
 from services.gcp_service import GCPAssetService
-from services.admin_service import AdminService
 from services.stripe_service import StripeService
 
 app = FastAPI(

@@ -2,9 +2,9 @@
 """
 Integration Testing Suite - Full AWS Integration
 """
+import json
 import os
 import sys
-import json
 from pathlib import Path
 
 # Add backend to path for imports
@@ -18,7 +18,7 @@ def test_aws_infrastructure():
     try:
         import boto3
         from botocore.exceptions import ClientError
-        
+
         # Test DynamoDB
         print("\n1. Testing DynamoDB...")
         dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
@@ -94,8 +94,9 @@ def test_fastapi_integration():
         })
         
         # Import and test FastAPI app
-        from backend.main import app
         from fastapi.testclient import TestClient
+
+        from backend.main import app
         
         client = TestClient(app)
         

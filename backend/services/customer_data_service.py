@@ -2,18 +2,19 @@
 Customer Data Service - Implements comprehensive data segregation and security
 """
 
-import boto3
-import json
+import base64
 import hashlib
+import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from cryptography.fernet import Fernet
-import base64
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import boto3
+from cryptography.fernet import Fernet
 
 from ..core.config import settings
-from ..models.audit import AuditEvent, AccessResult
+from ..models.audit import AccessResult, AuditEvent
 from .audit_service import AuditService
 from .encryption_service import CustomerEncryptionService
 

@@ -3,12 +3,13 @@
 GCP Integration Test using only built-in Python libraries
 """
 import json
-import urllib.request
-import urllib.parse
-import urllib.error
 import os
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime
+
 
 def log_info(message):
     print(f"✅ {message}")
@@ -134,7 +135,7 @@ def test_aws_infrastructure():
     try:
         import boto3
         from botocore.exceptions import ClientError
-        
+
         # Test DynamoDB
         try:
             dynamodb = boto3.resource('dynamodb', region_name='us-east-1')

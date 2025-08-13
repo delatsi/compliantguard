@@ -6,9 +6,11 @@ Integrates with existing executive dashboard
 
 import json
 import subprocess
-import requests
 from datetime import datetime
 from pathlib import Path
+
+import requests
+
 
 def discover_firebase_services(project_id):
     """Discover Firebase services for a given project"""

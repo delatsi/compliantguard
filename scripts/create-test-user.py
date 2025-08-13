@@ -2,12 +2,14 @@
 """
 Create Test User for AWS Deployment Testing
 """
-import boto3
-import uuid
 import hashlib
-from datetime import datetime
 import json
 import os
+import uuid
+from datetime import datetime
+
+import boto3
+
 
 def hash_password(password):
     """Simple password hashing using SHA256"""

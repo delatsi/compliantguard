@@ -2,11 +2,13 @@
 """
 Test GCP Scanning with Real Credentials on AWS Deployment
 """
-import requests
 import json
 import os
 import sys
 from pathlib import Path
+
+import requests
+
 
 def load_test_credentials():
     """Load test user credentials"""

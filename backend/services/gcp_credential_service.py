@@ -1,18 +1,17 @@
-import boto3
-import json
 import base64
+import json
 import uuid
 from datetime import datetime
 from typing import Dict, Optional
-from botocore.exceptions import ClientError
-from fastapi import HTTPException
-import structlog
 
+import boto3
+import structlog
+from botocore.exceptions import ClientError
+from core.config import settings
+from fastapi import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
-from core.config import settings
 
 logger = structlog.get_logger()
 

@@ -2,15 +2,15 @@
 """
 Simple Test Server - Minimal Dependencies
 """
-import json
-import uuid
+import base64
 import hashlib
 import hmac
-import base64
-from datetime import datetime, timedelta
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+import json
 import urllib.parse
+import uuid
+from datetime import datetime, timedelta
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 # Simple in-memory storage for testing
 users_db = {}

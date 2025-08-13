@@ -4,10 +4,11 @@ CompliantGuard Testing Control Script
 
 Unified entry point for all testing operations.
 """
-import sys
-import subprocess
 import argparse
+import subprocess
+import sys
 from pathlib import Path
+
 
 def run_local_tests():
     """Run local tests (zero dependencies)"""

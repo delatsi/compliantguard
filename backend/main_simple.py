@@ -1,11 +1,12 @@
+import base64
+import hashlib
+import hmac
 import json
 import os
-import boto3
-import hashlib
 import uuid
-import base64
-import hmac
 from datetime import datetime, timedelta
+
+import boto3
 
 # Initialize DynamoDB
 dynamodb = boto3.resource("dynamodb")

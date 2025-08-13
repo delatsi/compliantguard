@@ -2,23 +2,24 @@
 Comprehensive Audit Service - Complete audit logging and monitoring system
 """
 
-import boto3
+import asyncio
+import hashlib
 import json
 import uuid
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from collections import defaultdict, Counter
-import hashlib
-import asyncio
+from typing import Any, Dict, List, Optional
+
+import boto3
 
 from ..core.config import settings
 from ..models.audit import (
+    AccessResult,
     AuditEvent,
-    SecurityEvent,
     ComplianceEvent,
     DataAccessPattern,
-    AccessResult,
     EventType,
+    SecurityEvent,
     SecurityEventType,
     Severity,
 )

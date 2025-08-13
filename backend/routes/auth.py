@@ -1,18 +1,18 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-import boto3
-from botocore.exceptions import ClientError
 import uuid
 from datetime import datetime
+from typing import Optional
 
-from core.config import settings
+import boto3
+from botocore.exceptions import ClientError
 from core.auth import (
-    get_password_hash,
-    verify_password,
     create_access_token,
     get_current_user,
+    get_password_hash,
+    verify_password,
 )
+from core.config import settings
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 

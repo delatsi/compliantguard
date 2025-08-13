@@ -7,12 +7,12 @@ Run this for local development with mock data
 import os
 import sys
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # Set development environment
 os.environ["ENVIRONMENT"] = "development"
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 

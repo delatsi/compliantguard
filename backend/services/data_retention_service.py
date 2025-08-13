@@ -2,15 +2,16 @@
 Data Retention and Deletion Service - HIPAA compliant data lifecycle management
 """
 
-import boto3
+import asyncio
 import json
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
 from enum import Enum
-import asyncio
+from typing import Any, Dict, List, Optional
+
+import boto3
 
 from ..core.config import settings
-from ..models.audit import AuditEvent, AccessResult, EventType
+from ..models.audit import AccessResult, AuditEvent, EventType
 from .audit_service import AuditService
 from .encryption_service import CustomerEncryptionService
 

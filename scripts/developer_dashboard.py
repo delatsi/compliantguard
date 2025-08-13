@@ -5,10 +5,11 @@ Shows specific, actionable violations with fix commands.
 """
 
 import json
+import re
 import subprocess
 import sys
-from collections import defaultdict, Counter
-import re
+from collections import Counter, defaultdict
+
 
 def get_raw_violations_detailed():
     """Get detailed violations with full context"""
