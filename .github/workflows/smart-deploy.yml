@@ -364,7 +364,7 @@ jobs:
   deploy-frontend:
     needs: [detect-changes, test-frontend, deploy-backend]
     runs-on: ubuntu-latest
-    if: always() && !failure() && (needs.detect-changes.outputs.frontend_changed == 'true' || needs.detect-changes.outputs.deployment_strategy == 'full') && github.event_name != 'pull_request'
+    if: always() && !failure() && needs.detect-changes.outputs.deployment_strategy == 'full' && github.event_name != 'pull_request'
     environment: ${{ needs.detect-changes.outputs.environment }}
     
     outputs:
@@ -535,7 +535,7 @@ jobs:
   deploy-frontend-only:
     needs: [detect-changes, test-frontend]
     runs-on: ubuntu-latest
-    if: always() && !failure() && needs.detect-changes.outputs.deployment_strategy == 'frontend-only' && github.event_name != 'pull_request'
+    if: always() && !failure() && (needs.detect-changes.outputs.deployment_strategy == 'frontend-only' || (needs.detect-changes.outputs.frontend_changed == 'true' && needs.detect-changes.outputs.deployment_strategy != 'full')) && github.event_name != 'pull_request'
     environment: ${{ needs.detect-changes.outputs.environment }}
     
     steps:
