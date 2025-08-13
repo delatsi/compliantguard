@@ -316,6 +316,7 @@ jobs:
         sam deploy \
           --config-env "$ENVIRONMENT" \
           --stack-name "$STACK_NAME" \
+          --resolve-s3 \
           --no-confirm-changeset \
           --no-fail-on-empty-changeset \
           --parameter-overrides $PARAM_OVERRIDES

@@ -9,7 +9,6 @@ parallel = true
 [default.deploy]
 [default.deploy.parameters]
 stack_name = "themisguard-api"
-s3_bucket = ""  # SAM will create this automatically
 s3_prefix = "themisguard-api"
 region = "us-east-1"
 confirm_changeset = true
@@ -30,7 +29,6 @@ parallel = true
 [dev.deploy]
 [dev.deploy.parameters]
 stack_name = "themisguard-api-dev-debug"
-s3_bucket = ""
 s3_prefix = "themisguard-api-dev"
 region = "us-east-1"
 confirm_changeset = true
@@ -53,7 +51,6 @@ parallel = true
 [staging.deploy]
 [staging.deploy.parameters]
 stack_name = "themisguard-api-staging"
-s3_bucket = ""
 s3_prefix = "themisguard-api-staging"
 region = "us-east-1"
 confirm_changeset = true
@@ -76,7 +73,6 @@ parallel = true
 [prod.deploy]
 [prod.deploy.parameters]
 stack_name = "themisguard-api-prod"
-s3_bucket = ""
 s3_prefix = "themisguard-api-prod"
 region = "us-east-1"
 confirm_changeset = false
