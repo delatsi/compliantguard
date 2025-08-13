@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Minimal ThemisGuard API for testing debugging
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.11
+    Environment:
+      Variables:
+        ENVIRONMENT: dev
+        DYNAMODB_TABLE_NAME: "themisguard-minimal-scans"
+        S3_BUCKET_NAME: "themisguard-minimal-reports"
+        GCP_CREDENTIALS_TABLE: "themisguard-minimal-gcp-credentials" 
+        KMS_KEY_ALIAS: "alias/compliantguard-gcp-credentials"
+        JWT_SECRET_KEY: "debug-secret-key-minimal"
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+
+Resources:
+  # Lambda Function - Main API
+  ThemisGuardAPI:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: themisguard-minimal-api
+      CodeUri: backend/
+      Handler: main_simple.handler
+      Events:
+        ApiGateway:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        RootApiGateway:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: "*"
+
+  # Basic DynamoDB table for testing
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: themisguard-minimal-users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+
+Outputs:
+  ApiGatewayUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  
+  LambdaFunctionName:
+    Description: Lambda function name
+    Value: !Ref ThemisGuardAPI
