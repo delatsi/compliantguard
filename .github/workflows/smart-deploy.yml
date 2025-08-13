@@ -269,11 +269,55 @@ jobs:
       with:
         use-installer: true
 
+    - name: Set environment-specific AWS credentials
+      id: set-creds
+      run: |
+        ENVIRONMENT="${{ needs.detect-changes.outputs.environment }}"
+        echo "🔑 Setting AWS credentials for environment: $ENVIRONMENT"
+        
+        case "$ENVIRONMENT" in
+          "dev")
+            if [[ -z "${{ secrets.AWS_ACCESS_KEY_ID_DEV }}" ]]; then
+              echo "❌ AWS_ACCESS_KEY_ID_DEV secret is not configured"
+              exit 1
+            fi
+            echo "access-key-id=${{ secrets.AWS_ACCESS_KEY_ID_DEV }}" >> $GITHUB_OUTPUT
+            echo "secret-access-key=${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}" >> $GITHUB_OUTPUT
+            echo "✅ Using DEV AWS credentials"
+            ;;
+          "staging")
+            if [[ -z "${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}" ]]; then
+              echo "❌ AWS_ACCESS_KEY_ID_STAGING secret is not configured"
+              echo "🔄 Falling back to DEV credentials for staging deployment"
+              echo "access-key-id=${{ secrets.AWS_ACCESS_KEY_ID_DEV }}" >> $GITHUB_OUTPUT
+              echo "secret-access-key=${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}" >> $GITHUB_OUTPUT
+              echo "⚠️  Using DEV AWS credentials for staging (staging secrets not configured)"
+            else
+              echo "access-key-id=${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}" >> $GITHUB_OUTPUT
+              echo "secret-access-key=${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}" >> $GITHUB_OUTPUT
+              echo "✅ Using STAGING AWS credentials"
+            fi
+            ;;
+          "prod")
+            if [[ -z "${{ secrets.AWS_ACCESS_KEY_ID_PROD }}" ]]; then
+              echo "❌ AWS_ACCESS_KEY_ID_PROD secret is not configured"
+              exit 1
+            fi
+            echo "access-key-id=${{ secrets.AWS_ACCESS_KEY_ID_PROD }}" >> $GITHUB_OUTPUT
+            echo "secret-access-key=${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}" >> $GITHUB_OUTPUT
+            echo "✅ Using PROD AWS credentials"
+            ;;
+          *)
+            echo "❌ Unknown environment: $ENVIRONMENT"
+            exit 1
+            ;;
+        esac
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_ACCESS_KEY_ID_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_ACCESS_KEY_ID_STAGING || secrets.AWS_ACCESS_KEY_ID_PROD }}
-        aws-secret-access-key: ${{ needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_SECRET_ACCESS_KEY_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_SECRET_ACCESS_KEY_STAGING || secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        aws-access-key-id: ${{ steps.set-creds.outputs.access-key-id }}
+        aws-secret-access-key: ${{ steps.set-creds.outputs.secret-access-key }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Cache SAM dependencies
