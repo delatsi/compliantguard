@@ -502,10 +502,9 @@ jobs:
           echo "📦 Creating frontend infrastructure..."
           aws cloudformation create-stack \
             --stack-name "$STACK_NAME" \
-            --template-body file://frontend-template.yaml \
+            --template-body file://frontend-simple.yaml \
             --parameters \
               ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
-              ParameterKey=ProjectName,ParameterValue=compliantguard \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
             --tags \
               Key=Environment,Value="$ENVIRONMENT" \
@@ -526,10 +525,9 @@ jobs:
           echo "🔄 Attempting to update infrastructure..."
           aws cloudformation update-stack \
             --stack-name "$STACK_NAME" \
-            --template-body file://frontend-template.yaml \
+            --template-body file://frontend-simple.yaml \
             --parameters \
               ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
-              ParameterKey=ProjectName,ParameterValue=compliantguard \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND 2>/dev/null || echo "No updates needed"
         fi
 
@@ -585,7 +583,7 @@ jobs:
         # Get S3 bucket from infrastructure stack
         BUCKET_NAME=$(aws cloudformation describe-stacks \
           --stack-name "$STACK_NAME" \
-          --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucketName`].OutputValue' \
+          --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
           --output text 2>/dev/null || echo "")
         
         if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
@@ -610,34 +608,16 @@ jobs:
         # Get frontend URL
         FRONTEND_URL=$(aws cloudformation describe-stacks \
           --stack-name "$STACK_NAME" \
-          --query 'Stacks[0].Outputs[?OutputKey==`FrontendURL`].OutputValue' \
+          --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' \
           --output text 2>/dev/null || echo "")
         
         echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
         echo "✅ Frontend deployed successfully"
         echo "🌐 Frontend URL: $FRONTEND_URL"
 
-    - name: Invalidate CloudFront cache
+    - name: Frontend deployment complete
       run: |
-        ENVIRONMENT="${{ needs.detect-changes.outputs.environment }}"
-        STACK_NAME="compliantguard-frontend-${ENVIRONMENT}"
-        
-        DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
-          --stack-name "$STACK_NAME" \
-          --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
-          --output text 2>/dev/null || echo "")
-        
-        if [[ -n "$DISTRIBUTION_ID" && "$DISTRIBUTION_ID" != "None" ]]; then
-          echo "🔄 Invalidating CloudFront cache..."
-          INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id "$DISTRIBUTION_ID" \
-            --paths "/*" \
-            --query 'Invalidation.Id' \
-            --output text)
-          echo "✅ CloudFront invalidation started: $INVALIDATION_ID"
-        else
-          echo "⚠️ CloudFront distribution not found, skipping cache invalidation"
-        fi
+        echo "✅ Frontend deployed successfully to S3 static hosting"
 
   # Deploy frontend only (when backend hasn't changed)
   deploy-frontend-only:
@@ -711,24 +691,13 @@ jobs:
         # Get S3 bucket
         BUCKET_NAME=$(aws cloudformation describe-stacks \
           --stack-name "$STACK_NAME" \
-          --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucketName`].OutputValue' \
+          --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
           --output text)
         
         # Deploy to S3
         aws s3 sync dist/ "s3://$BUCKET_NAME/" --delete
         
-        # Invalidate CloudFront
-        DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
-          --stack-name "$STACK_NAME" \
-          --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistributionId`].OutputValue' \
-          --output text 2>/dev/null || echo "")
-        
-        if [[ -n "$DISTRIBUTION_ID" && "$DISTRIBUTION_ID" != "None" ]]; then
-          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
-          echo "✅ Frontend deployed and cache invalidated"
-        else
-          echo "✅ Frontend deployed (no CloudFront cache to invalidate)"
-        fi
+        echo "✅ Frontend deployed successfully to S3 static hosting"
 
   # Final smoke tests
   smoke-test:
@@ -758,7 +727,7 @@ jobs:
         # Get Frontend URL  
         FRONTEND_URL=$(aws cloudformation describe-stacks \
           --stack-name "compliantguard-frontend-${ENVIRONMENT}" \
-          --query 'Stacks[0].Outputs[?OutputKey==`FrontendURL`].OutputValue' \
+          --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' \
           --output text 2>/dev/null || echo "")
         
         echo "api_url=$API_URL" >> $GITHUB_OUTPUT
