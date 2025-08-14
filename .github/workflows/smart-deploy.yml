@@ -659,16 +659,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ 
-          needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_ACCESS_KEY_ID_DEV ||
-          needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_ACCESS_KEY_ID_STAGING ||
-          secrets.AWS_ACCESS_KEY_ID_PROD
-        }}
-        aws-secret-access-key: ${{ 
-          needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_SECRET_ACCESS_KEY_DEV ||
-          needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_SECRET_ACCESS_KEY_STAGING ||
-          secrets.AWS_SECRET_ACCESS_KEY_PROD
-        }}
+        aws-access-key-id: ${{ needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_ACCESS_KEY_ID_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_ACCESS_KEY_ID_STAGING || secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_SECRET_ACCESS_KEY_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_SECRET_ACCESS_KEY_STAGING || secrets.AWS_SECRET_ACCESS_KEY_PROD }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Get existing API URL
@@ -748,16 +740,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ 
-          needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_ACCESS_KEY_ID_DEV ||
-          needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_ACCESS_KEY_ID_STAGING ||
-          secrets.AWS_ACCESS_KEY_ID_PROD
-        }}
-        aws-secret-access-key: ${{ 
-          needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_SECRET_ACCESS_KEY_DEV ||
-          needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_SECRET_ACCESS_KEY_STAGING ||
-          secrets.AWS_SECRET_ACCESS_KEY_PROD
-        }}
+        aws-access-key-id: ${{ needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_ACCESS_KEY_ID_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_ACCESS_KEY_ID_STAGING || secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ needs.detect-changes.outputs.environment == 'dev' && secrets.AWS_SECRET_ACCESS_KEY_DEV || needs.detect-changes.outputs.environment == 'staging' && secrets.AWS_SECRET_ACCESS_KEY_STAGING || secrets.AWS_SECRET_ACCESS_KEY_PROD }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Get deployment URLs
