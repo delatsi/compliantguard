@@ -580,7 +580,26 @@ jobs:
         ENVIRONMENT="${{ needs.detect-changes.outputs.environment }}"
         STACK_NAME="compliantguard-frontend-${ENVIRONMENT}"
         
-        # Get S3 bucket from infrastructure stack
+        # Get S3 bucket from infrastructure stack with debugging
+        echo "🔍 Checking stack outputs for bucket name..."
+        
+        # First check if stack exists and is in good state
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        echo "📊 Stack status: $STACK_STATUS"
+        
+        if [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" ]]; then
+          echo "❌ Stack not ready. Status: $STACK_STATUS"
+          exit 1
+        fi
+        
+        # List all outputs for debugging
+        echo "📋 Available stack outputs:"
+        aws cloudformation describe-stacks \
+          --stack-name "$STACK_NAME" \
+          --query 'Stacks[0].Outputs[].{Key:OutputKey,Value:OutputValue}' \
+          --output table || echo "No outputs found"
+        
+        # Get bucket name with better error handling
         BUCKET_NAME=$(aws cloudformation describe-stacks \
           --stack-name "$STACK_NAME" \
           --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
@@ -588,6 +607,10 @@ jobs:
         
         if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
           echo "❌ Could not get S3 bucket name from infrastructure stack"
+          echo "🔍 This might be because:"
+          echo "   - Stack outputs don't include 'BucketName'"
+          echo "   - Stack is in wrong state: $STACK_STATUS"
+          echo "   - Query syntax doesn't match output structure"
           exit 1
         fi
         
@@ -688,11 +711,27 @@ jobs:
         ENVIRONMENT="${{ needs.detect-changes.outputs.environment }}"
         STACK_NAME="compliantguard-frontend-${ENVIRONMENT}"
         
-        # Get S3 bucket
+        # Get S3 bucket with debugging
+        echo "🔍 Retrieving bucket name from stack: $STACK_NAME"
+        
+        # List outputs for debugging
+        echo "📋 Available outputs:"
+        aws cloudformation describe-stacks \
+          --stack-name "$STACK_NAME" \
+          --query 'Stacks[0].Outputs[].{Key:OutputKey,Value:OutputValue}' \
+          --output table || echo "No outputs found"
+        
         BUCKET_NAME=$(aws cloudformation describe-stacks \
           --stack-name "$STACK_NAME" \
           --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
           --output text)
+        
+        if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
+          echo "❌ Could not retrieve bucket name from stack outputs"
+          exit 1
+        fi
+        
+        echo "📦 Using S3 bucket: $BUCKET_NAME"
         
         # Deploy to S3
         aws s3 sync dist/ "s3://$BUCKET_NAME/" --delete
