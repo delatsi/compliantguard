@@ -520,6 +520,33 @@ jobs:
           echo "✅ Frontend infrastructure created"
         elif [[ "$STACK_STATUS" =~ ^(CREATE_COMPLETE|UPDATE_COMPLETE)$ ]]; then
           echo "✅ Frontend infrastructure already exists and is ready"
+        elif [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
+          echo "🚨 Stack is in ROLLBACK_COMPLETE state - previous creation failed"
+          echo "🗑️ Deleting failed stack to allow recreation..."
+          aws cloudformation delete-stack --stack-name "$STACK_NAME"
+          echo "⏳ Waiting for stack deletion..."
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
+          echo "✅ Failed stack deleted"
+          
+          echo "📦 Creating fresh frontend infrastructure..."
+          aws cloudformation create-stack \
+            --stack-name "$STACK_NAME" \
+            --template-body file://frontend-simple.yaml \
+            --parameters \
+              ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --tags \
+              Key=Environment,Value="$ENVIRONMENT" \
+              Key=Project,Value=CompliantGuard \
+              Key=Component,Value=frontend \
+              Key=Tier,Value="${{ needs.detect-changes.outputs.environment == 'prod' && 'production' || 'development' }}" \
+              Key=Owner,Value=DevOps \
+              Key=CostCenter,Value=Engineering \
+              Key=ManagedBy,Value=GitHubActions
+          
+          echo "⏳ Waiting for infrastructure creation..."
+          aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
+          echo "✅ Frontend infrastructure created successfully"
         else
           echo "⚠️ Infrastructure in unexpected state: $STACK_STATUS"
           echo "🔄 Attempting to update infrastructure..."
