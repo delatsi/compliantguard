@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Ultra-minimal S3 static website hosting
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+  # S3 Bucket for hosting static website
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  # Bucket Policy to allow public read access
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket}/*"
+
+Outputs:
+  BucketName:
+    Description: Name of the S3 bucket
+    Value: !Ref FrontendBucket
+
+  WebsiteURL:
+    Description: URL for website hosted on S3
+    Value: !GetAtt FrontendBucket.WebsiteURL

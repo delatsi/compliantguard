@@ -502,7 +502,7 @@ jobs:
           echo "📦 Creating frontend infrastructure..."
           aws cloudformation create-stack \
             --stack-name "$STACK_NAME" \
-            --template-body file://frontend-simple.yaml \
+            --template-body file://frontend-minimal.yaml \
             --parameters \
               ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
@@ -528,10 +528,10 @@ jobs:
           aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
           echo "✅ Failed stack deleted"
           
-          echo "📦 Creating fresh frontend infrastructure..."
-          aws cloudformation create-stack \
+          echo "📦 Attempting to create fresh frontend infrastructure..."
+          if aws cloudformation create-stack \
             --stack-name "$STACK_NAME" \
-            --template-body file://frontend-simple.yaml \
+            --template-body file://frontend-minimal.yaml \
             --parameters \
               ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
@@ -542,17 +542,36 @@ jobs:
               Key=Tier,Value="${{ needs.detect-changes.outputs.environment == 'prod' && 'production' || 'development' }}" \
               Key=Owner,Value=DevOps \
               Key=CostCenter,Value=Engineering \
-              Key=ManagedBy,Value=GitHubActions
-          
-          echo "⏳ Waiting for infrastructure creation..."
-          aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
-          echo "✅ Frontend infrastructure created successfully"
+              Key=ManagedBy,Value=GitHubActions; then
+            echo "⏳ Waiting for infrastructure creation..."
+            if aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"; then
+              echo "✅ Frontend infrastructure created successfully"
+            else
+              echo "❌ Stack creation failed again. Falling back to direct S3 bucket creation..."
+              # Fallback: create bucket directly without CloudFormation
+              BUCKET_NAME="compliantguard-frontend-fallback-${ENVIRONMENT}-$(date +%s)"
+              echo "🪣 Creating fallback S3 bucket: $BUCKET_NAME"
+              aws s3 mb "s3://$BUCKET_NAME" --region us-east-1
+              aws s3 website "s3://$BUCKET_NAME" --index-document index.html --error-document index.html
+              echo "FALLBACK_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
+              echo "✅ Fallback bucket created: $BUCKET_NAME"
+            fi
+          else
+            echo "❌ CloudFormation create-stack command failed. Using direct S3 approach..."
+            # Immediate fallback: create bucket directly
+            BUCKET_NAME="compliantguard-frontend-fallback-${ENVIRONMENT}-$(date +%s)"
+            echo "🪣 Creating fallback S3 bucket: $BUCKET_NAME"
+            aws s3 mb "s3://$BUCKET_NAME" --region us-east-1
+            aws s3 website "s3://$BUCKET_NAME" --index-document index.html --error-document index.html
+            echo "FALLBACK_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
+            echo "✅ Fallback bucket created: $BUCKET_NAME"
+          fi
         else
           echo "⚠️ Infrastructure in unexpected state: $STACK_STATUS"
           echo "🔄 Attempting to update infrastructure..."
           aws cloudformation update-stack \
             --stack-name "$STACK_NAME" \
-            --template-body file://frontend-simple.yaml \
+            --template-body file://frontend-minimal.yaml \
             --parameters \
               ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND 2>/dev/null || echo "No updates needed"
@@ -626,19 +645,26 @@ jobs:
           --query 'Stacks[0].Outputs[].{Key:OutputKey,Value:OutputValue}' \
           --output table || echo "No outputs found"
         
-        # Get bucket name with better error handling
-        BUCKET_NAME=$(aws cloudformation describe-stacks \
-          --stack-name "$STACK_NAME" \
-          --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
-          --output text 2>/dev/null || echo "")
-        
-        if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
-          echo "❌ Could not get S3 bucket name from infrastructure stack"
-          echo "🔍 This might be because:"
-          echo "   - Stack outputs don't include 'BucketName'"
-          echo "   - Stack is in wrong state: $STACK_STATUS"
-          echo "   - Query syntax doesn't match output structure"
-          exit 1
+        # Get bucket name - either from CloudFormation or fallback
+        if [[ -n "${FALLBACK_BUCKET}" ]]; then
+          BUCKET_NAME="${FALLBACK_BUCKET}"
+          echo "📦 Using fallback bucket: $BUCKET_NAME"
+        else
+          # Get bucket name from CloudFormation stack
+          BUCKET_NAME=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -z "$BUCKET_NAME" || "$BUCKET_NAME" == "None" ]]; then
+            echo "❌ Could not get S3 bucket name from infrastructure stack"
+            echo "🔍 This might be because:"
+            echo "   - Stack outputs don't include 'BucketName'"
+            echo "   - Stack is in wrong state: $STACK_STATUS"
+            echo "   - Query syntax doesn't match output structure"
+            exit 1
+          fi
+          echo "📦 Using CloudFormation bucket: $BUCKET_NAME"
         fi
         
         echo "📤 Deploying frontend to S3 bucket: $BUCKET_NAME"
