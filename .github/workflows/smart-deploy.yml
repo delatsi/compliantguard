@@ -506,7 +506,7 @@ jobs:
             --parameters \
               ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
               ParameterKey=ProjectName,ParameterValue=compliantguard \
-            --capabilities CAPABILITY_IAM \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
             --tags \
               Key=Environment,Value="$ENVIRONMENT" \
               Key=Project,Value=CompliantGuard \
@@ -530,7 +530,7 @@ jobs:
             --parameters \
               ParameterKey=Environment,ParameterValue="$ENVIRONMENT" \
               ParameterKey=ProjectName,ParameterValue=compliantguard \
-            --capabilities CAPABILITY_IAM 2>/dev/null || echo "No updates needed"
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND 2>/dev/null || echo "No updates needed"
         fi
 
     - name: Install dependencies and build
