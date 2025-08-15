@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useVersion } from '../hooks/useVersion';
 import { 
   ShieldCheckIcon, 
   DocumentMagnifyingGlassIcon, 
@@ -10,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Landing = () => {
+  const { version, loading } = useVersion();
   const features = [
     {
       name: 'HIPAA Compliance Scanning',
@@ -171,7 +173,12 @@ const Landing = () => {
             </div>
           </div>
           <p className="mt-4 text-center text-gray-400">
-            © 2024 ThemisGuard. All rights reserved.
+            © {new Date().getFullYear()} ThemisGuard. All rights reserved.
+            {!loading && (
+              <span className="block text-sm text-gray-500 mt-1">
+                v{version.app_version} • Built {version.build_date}
+              </span>
+            )}
           </p>
         </div>
       </footer>

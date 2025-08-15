@@ -257,7 +257,7 @@ const Pricing = () => {
             </div>
           </div>
           <p className="mt-4 text-center text-gray-400">
-            © 2024 ThemisGuard. All rights reserved.
+            © {new Date().getFullYear()} ThemisGuard. All rights reserved.
           </p>
         </div>
       </footer>

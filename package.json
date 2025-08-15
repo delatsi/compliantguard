@@ -13,6 +13,7 @@
     "deploy": "sam build && sam deploy",
     "prepare": "husky",
     "validate": "cd frontend && npm run lint && npm run test:run && npm run build",
+    "validate-all": "./scripts/dev-validate.sh",
     "lint": "cd frontend && npm run lint",
     "test": "cd frontend && npm run test:run",
     "precommit": "npm run validate"

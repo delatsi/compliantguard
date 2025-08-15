@@ -91,52 +91,86 @@ app.add_middleware(
 # Routes
 @app.get("/")
 async def root():
-    return {
+    print("🏠 [PROD] Root endpoint accessed")
+    print(f"🌍 [PROD] Environment: {settings.ENVIRONMENT}")
+    print(f"📍 [PROD] Region: {settings.AWS_REGION}")
+
+    response = {
         "message": "ThemisGuard HIPAA Compliance API (Production Mode)",
-        "version": "1.0.0",
+        "version": "1.3.0",
         "environment": settings.ENVIRONMENT,
+        "status": "operational",
+        "timestamp": datetime.utcnow().isoformat(),
     }
+
+    print(f"✅ [PROD] Root response: {response}")
+    return response
 
 
 @app.get("/health")
 async def health_check():
+    print("❤️ [PROD] Health check endpoint accessed")
+    print(f"🕐 [PROD] Timestamp: {datetime.utcnow().isoformat()}")
+
     health_details = {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "environment": settings.ENVIRONMENT,
         "region": settings.AWS_REGION,
         "services": {},
+        "version": "1.3.0",
     }
 
+    # Test AWS connectivity
     try:
         # Test DynamoDB
+        print("🗄️ [PROD] Testing DynamoDB connectivity...")
         dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
         test_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
-        test_table.table_status
+        test_table.table_status  # This will raise exception if table doesn't exist
         health_details["services"]["dynamodb"] = "connected"
+        print(f"✅ [PROD] DynamoDB table accessible: {settings.DYNAMODB_TABLE_NAME}")
     except Exception as e:
+        print(f"❌ [PROD] DynamoDB error: {str(e)}")
         health_details["services"]["dynamodb"] = f"error: {str(e)}"
+        health_details["status"] = "degraded"
 
     try:
         # Test S3
+        print("🗂️ [PROD] Testing S3 connectivity...")
         s3 = boto3.client("s3", region_name=settings.AWS_REGION)
         s3.head_bucket(Bucket=settings.S3_BUCKET_NAME)
         health_details["services"]["s3"] = "connected"
+        print(f"✅ [PROD] S3 bucket accessible: {settings.S3_BUCKET_NAME}")
     except Exception as e:
+        print(f"❌ [PROD] S3 error: {str(e)}")
         health_details["services"]["s3"] = f"error: {str(e)}"
+        if health_details["status"] != "degraded":
+            health_details["status"] = "degraded"
 
+    print(f"📊 [PROD] Health check result: {health_details['status']}")
     return health_details
 
 
 # Authentication endpoints
 @app.post("/api/v1/auth/login")
 async def login(request: AuthRequest):
+    print("🔑 [PROD] Login attempt initiated")
+    print(f"📧 [PROD] Email: {request.email}")
+    print(f"🔐 [PROD] Has password: {bool(request.password)}")
+    print(f"🕰️ [PROD] Timestamp: {datetime.utcnow().isoformat()}")
+
     # Production authentication would integrate with AWS Cognito
-    return {
+    response = {
         "user": MOCK_USER,
         "token": "prod-jwt-token",
         "message": "Login successful (production mode)",
+        "timestamp": datetime.utcnow().isoformat(),
     }
+
+    print("✅ [PROD] Login successful")
+    print(f"👤 [PROD] User: {MOCK_USER['user_id']}")
+    return response
 
 
 @app.post("/api/v1/auth/register")
@@ -157,7 +191,18 @@ async def register(request: RegisterRequest):
 
 @app.get("/api/v1/auth/verify")
 async def verify_token():
-    return {"user": MOCK_USER}
+    print("🔍 [PROD] Token verification request")
+    print(f"🕰️ [PROD] Timestamp: {datetime.utcnow().isoformat()}")
+
+    response = {
+        "user": MOCK_USER,
+        "timestamp": datetime.utcnow().isoformat(),
+        "valid": True,
+    }
+
+    print("✅ [PROD] Token verification successful")
+    print(f"👤 [PROD] User: {MOCK_USER['user_id']}")
+    return response
 
 
 # Scanning endpoints
