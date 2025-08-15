@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Version update to test deployment pipeline
 const APP_VERSION = '1.0.1';
@@ -59,6 +59,9 @@ function App() {
                   <Route path="documentation" element={<Documentation />} />
                   <Route path="settings" element={<Settings />} />
                 </Route>
+                
+                {/* Dashboard redirect - redirect to protected app */}
+                <Route path="/dashboard" element={<Navigate to="/app" replace />} />
                 
                 {/* Protected Routes */}
                 <Route path="/app" element={

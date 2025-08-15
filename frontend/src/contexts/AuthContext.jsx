@@ -40,13 +40,32 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'SET_LOADING', loading: true });
       const response = await authAPI.verifyToken(token);
-      dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.user, token });
-    } catch {
-      localStorage.removeItem('token');
-      dispatch({ type: 'LOGOUT' });
-    } finally {
-      dispatch({ type: 'SET_LOADING', loading: false });
+      
+      // Check if we have a valid response with user data
+      if (response.data && response.data.user) {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.user, token });
+      } else {
+        // Invalid response format, treat as invalid token
+        console.warn('Token verification returned invalid response format:', response.data);
+        localStorage.removeItem('token');
+        dispatch({ type: 'LOGOUT' });
+      }
+    } catch (error) {
+      console.warn('Token verification failed:', error.response?.status, error.response?.data);
+      // Only remove token if it's definitely invalid (401/403)
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem('token');
+        dispatch({ type: 'LOGOUT' });
+      } else {
+        // Network error or server error - keep token but don't set user as authenticated
+        console.log('Network/server error during token verification, keeping token for retry');
+        dispatch({ type: 'SET_LOADING', loading: false });
+        return; // Early return to avoid the finally block
+      }
     }
+    
+    // Set loading to false for successful and invalid token cases
+    dispatch({ type: 'SET_LOADING', loading: false });
   };
 
   const login = async (email, password) => {

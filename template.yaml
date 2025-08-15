@@ -11,7 +11,7 @@ Globals:
       Variables:
         ENVIRONMENT: !Ref Environment
         DYNAMODB_TABLE_NAME: !Sub "${ProjectName}-${Environment}-scans"
-        S3_BUCKET_NAME: !Sub "${ProjectName}-${Environment}-reports"
+        S3_BUCKET_NAME: !Sub "${ProjectName}-${Environment}-reports-${AWS::AccountId}"
         GCP_CREDENTIALS_TABLE: !Sub "${ProjectName}-${Environment}-gcp-credentials"
         KMS_KEY_ALIAS: !Sub "alias/${ProjectName}-${Environment}-gcp-credentials"
         JWT_SECRET_KEY: !Ref JWTSecretKey
