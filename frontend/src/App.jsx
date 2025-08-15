@@ -15,6 +15,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Scan from './pages/Scan';
 import Reports from './pages/Reports';
+import ReportDetail from './pages/ReportDetail';
 import Settings from './pages/Settings';
 import Documentation from './pages/Documentation';
 import AdminLogin from './pages/AdminLogin';
@@ -54,6 +55,7 @@ function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="scan" element={<Scan />} />
                   <Route path="reports" element={<Reports />} />
+                  <Route path="reports/:scanId" element={<ReportDetail />} />
                   <Route path="documentation" element={<Documentation />} />
                   <Route path="settings" element={<Settings />} />
                 </Route>
@@ -67,6 +69,7 @@ function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="scan" element={<Scan />} />
                   <Route path="reports" element={<Reports />} />
+                  <Route path="reports/:scanId" element={<ReportDetail />} />
                   <Route path="documentation" element={<Documentation />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="subscription" element={<SubscriptionManagement />} />

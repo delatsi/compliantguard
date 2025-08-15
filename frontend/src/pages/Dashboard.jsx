@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useDemoData } from '../contexts/DemoContext';
+import { complianceAPI } from '../services/api';
 import { 
   ShieldCheckIcon, 
   ExclamationTriangleIcon,
@@ -17,47 +18,68 @@ const Dashboard = () => {
   const location = useLocation();
   const { demoData } = useDemoData();
   const isDemoMode = location.pathname.startsWith('/demo');
+  
+  // State for live dashboard data
+  const [liveDashboardData, setLiveDashboardData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Use demo data if in demo mode, otherwise use mock data
-  const dashboardStats = isDemoMode ? demoData.dashboardStats : {
-    total_scans: 12,
-    total_projects: 4,
-    overall_compliance_score: 87,
-    violation_summary: {
-      total_violations: 23,
-      critical_violations: 2,
-      high_violations: 8,
-      medium_violations: 10,
-      low_violations: 3
+  // Fetch live dashboard data when not in demo mode
+  useEffect(() => {
+    if (!isDemoMode) {
+      fetchDashboardData();
+    }
+  }, [isDemoMode]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      console.log('📊 Fetching live dashboard data...');
+      const response = await complianceAPI.getDashboard();
+      console.log('✅ Dashboard data fetched:', response.data);
+      setLiveDashboardData(response.data);
+    } catch (err) {
+      console.error('❌ Failed to fetch dashboard data:', err);
+      setError(err.response?.data?.detail || 'Failed to load dashboard data');
+      // Fallback to mock data on error
+      setLiveDashboardData({
+        total_scans: 0,
+        total_projects: 0,
+        overall_compliance_score: 0,
+        violation_summary: {
+          total_violations: 0,
+          critical_violations: 0,
+          high_violations: 0,
+          medium_violations: 0,
+          low_violations: 0
+        },
+        recent_scans: []
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const recentScans = isDemoMode ? demoData.recentScans : [
-    {
-      scan_id: '1',
-      project_name: 'production-app',
-      scan_timestamp: '2024-01-15T10:30:00Z',
-      compliance_score: 92,
-      total_violations: 8,
-      status: 'completed',
-    },
-    {
-      scan_id: '2',
-      project_name: 'staging-env',
-      scan_timestamp: '2024-01-14T15:20:00Z',
-      compliance_score: 78,
-      total_violations: 15,
-      status: 'completed',
-    },
-    {
-      scan_id: '3',
-      project_name: 'dev-environment',
-      scan_timestamp: '2024-01-13T16:45:00Z',
-      compliance_score: 85,
-      total_violations: 12,
-      status: 'completed',
-    },
-  ];
+  // Use demo data if in demo mode, otherwise use live API data
+  const dashboardStats = isDemoMode 
+    ? demoData.dashboardStats 
+    : (liveDashboardData || {
+        total_scans: 0,
+        total_projects: 0,
+        overall_compliance_score: 0,
+        violation_summary: {
+          total_violations: 0,
+          critical_violations: 0,
+          high_violations: 0,
+          medium_violations: 0,
+          low_violations: 0
+        }
+      });
+
+  const recentScans = isDemoMode 
+    ? demoData.recentScans 
+    : (liveDashboardData?.recent_scans || []);
 
   const stats = [
     {
@@ -111,15 +133,53 @@ const Dashboard = () => {
             Overview of your HIPAA compliance status
           </p>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
+        <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
+          {!isDemoMode && (
+            <button
+              onClick={fetchDashboardData}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          )}
           <Link
-            to="/app/scan"
-            className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            to={isDemoMode ? "/demo/scan" : "/app/scan"}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             New Scan
           </Link>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && !isDemoMode && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="text-sm text-red-600">{error}</div>
+          <button 
+            onClick={fetchDashboardData}
+            className="mt-2 text-sm text-red-600 underline hover:text-red-800"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && !isDemoMode && (
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

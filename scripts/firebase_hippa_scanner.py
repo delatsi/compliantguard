@@ -589,7 +589,26 @@ Firebase services use **client-side security models** that differ from tradition
 
 
 if __name__ == "__main__":
-    # Test the Firebase scanner
-    project_id = "medtelligence"
-    report = generate_firebase_hipaa_report(project_id)
+    # Get project ID from environment or command line
+    import sys
+    import os
+    
+    project_id = os.environ.get("GCP_PROJECT_ID")
+    if not project_id and len(sys.argv) > 1:
+        project_id = sys.argv[1]
+    if not project_id:
+        project_id = "medtelligence"  # Default fallback
+    
+    print(f"🔍 Scanning project: {project_id}", file=sys.stderr)
+    
+    # Run the scanner but capture output to avoid mixing logs with JSON
+    old_stdout = sys.stdout
+    sys.stdout = sys.stderr  # Redirect prints to stderr
+    
+    try:
+        report = generate_firebase_hipaa_report(project_id)
+    finally:
+        sys.stdout = old_stdout  # Restore stdout
+    
+    # Output only clean JSON to stdout
     print(json.dumps(report, indent=2))

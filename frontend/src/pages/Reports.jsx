@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useDemoData } from '../contexts/DemoContext';
+import { complianceAPI } from '../services/api';
 import { 
   DocumentTextIcon,
   ClockIcon,
@@ -14,8 +15,37 @@ const Reports = () => {
   const location = useLocation();
   const { demoData } = useDemoData();
   const isDemoMode = location.pathname.startsWith('/demo');
+  
+  // State for real API reports
+  const [realReports, setRealReports] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const reports = isDemoMode ? demoData.recentScans : [];
+  // Fetch reports from API when not in demo mode
+  useEffect(() => {
+    if (!isDemoMode) {
+      fetchReports();
+    }
+  }, [isDemoMode]);
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      console.log('📋 Fetching reports from API...');
+      const response = await complianceAPI.listReports();
+      console.log('✅ Reports fetched:', response.data);
+      setRealReports(response.data.reports || []);
+    } catch (err) {
+      console.error('❌ Failed to fetch reports:', err);
+      setError(err.response?.data?.detail || 'Failed to load reports');
+      setRealReports([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reports = isDemoMode ? demoData.recentScans : realReports;
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -45,10 +75,19 @@ const Reports = () => {
             View and manage your HIPAA compliance scan reports
           </p>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
+        <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
+          {!isDemoMode && (
+            <button
+              onClick={fetchReports}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          )}
           <Link
             to={isDemoMode ? "/demo/scan" : "/app/scan"}
-            className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
           >
             New Scan
           </Link>
@@ -140,9 +179,39 @@ const Reports = () => {
         </div>
       )}
 
+      {/* Error Message */}
+      {error && !isDemoMode && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="text-sm text-red-600">{error}</div>
+          <button 
+            onClick={fetchReports}
+            className="mt-2 text-sm text-red-600 underline hover:text-red-800"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && !isDemoMode && (
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reports Table */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
+      {!loading && (
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
           {reports.length > 0 ? (
             <div className="overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
@@ -219,10 +288,13 @@ const Reports = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button className="text-primary-600 hover:text-primary-900 flex items-center">
+                          <Link 
+                            to={`${isDemoMode ? '/demo' : '/app'}/reports/${report.scan_id}`}
+                            className="text-primary-600 hover:text-primary-900 flex items-center"
+                          >
                             <EyeIcon className="h-4 w-4 mr-1" />
                             View Details
-                          </button>
+                          </Link>
                         </td>
                       </tr>
                     );
@@ -247,8 +319,9 @@ const Reports = () => {
               </Link>
             </div>
           )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
