@@ -551,20 +551,30 @@ jobs:
               # Fallback: create bucket directly without CloudFormation
               BUCKET_NAME="compliantguard-frontend-fallback-${ENVIRONMENT}-$(date +%s)"
               echo "🪣 Creating fallback S3 bucket: $BUCKET_NAME"
-              aws s3 mb "s3://$BUCKET_NAME" --region us-east-1
-              aws s3 website "s3://$BUCKET_NAME" --index-document index.html --error-document index.html
-              echo "FALLBACK_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
-              echo "✅ Fallback bucket created: $BUCKET_NAME"
+              if aws s3 mb "s3://$BUCKET_NAME" --region us-east-1; then
+                aws s3 website "s3://$BUCKET_NAME" --index-document index.html --error-document index.html
+                echo "FALLBACK_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
+                echo "✅ Fallback bucket created successfully: $BUCKET_NAME"
+                echo "🎯 Infrastructure deployment completed using fallback method"
+              else
+                echo "❌ Failed to create fallback S3 bucket. This is a critical failure."
+                exit 1
+              fi
             fi
           else
             echo "❌ CloudFormation create-stack command failed. Using direct S3 approach..."
             # Immediate fallback: create bucket directly
             BUCKET_NAME="compliantguard-frontend-fallback-${ENVIRONMENT}-$(date +%s)"
             echo "🪣 Creating fallback S3 bucket: $BUCKET_NAME"
-            aws s3 mb "s3://$BUCKET_NAME" --region us-east-1
-            aws s3 website "s3://$BUCKET_NAME" --index-document index.html --error-document index.html
-            echo "FALLBACK_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
-            echo "✅ Fallback bucket created: $BUCKET_NAME"
+            if aws s3 mb "s3://$BUCKET_NAME" --region us-east-1; then
+              aws s3 website "s3://$BUCKET_NAME" --index-document index.html --error-document index.html
+              echo "FALLBACK_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
+              echo "✅ Fallback bucket created successfully: $BUCKET_NAME"
+              echo "🎯 Infrastructure deployment completed using fallback method"
+            else
+              echo "❌ Failed to create fallback S3 bucket. This is a critical failure."
+              exit 1
+            fi
           fi
         else
           echo "⚠️ Infrastructure in unexpected state: $STACK_STATUS"
@@ -581,6 +591,7 @@ jobs:
       run: |
         cd frontend
         echo "📦 Installing frontend dependencies..."
+        echo "🔍 Environment debug - FALLBACK_BUCKET: ${FALLBACK_BUCKET:-'not set'}"
         npm ci
 
     - name: Build frontend with API URL
@@ -633,8 +644,20 @@ jobs:
         STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
         echo "📊 Stack status: $STACK_STATUS"
         
-        if [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" ]]; then
-          echo "❌ Stack not ready. Status: $STACK_STATUS"
+        # Handle different stack states appropriately
+        if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
+          echo "⚠️ Stack is in ROLLBACK_COMPLETE state, but infrastructure step should have handled this"
+          echo "🔍 Checking if fallback bucket was created..."
+          if [[ -n "${FALLBACK_BUCKET}" ]]; then
+            echo "✅ Found fallback bucket: ${FALLBACK_BUCKET}"
+          else
+            echo "❌ No fallback bucket found. Infrastructure deployment may have failed."
+            echo "🔍 Available environment variables:"
+            env | grep -E "(BUCKET|FALLBACK)" || echo "No bucket-related environment variables found"
+            exit 1
+          fi
+        elif [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" && "$STACK_STATUS" != "DOES_NOT_EXIST" ]]; then
+          echo "❌ Stack in unexpected state: $STACK_STATUS"
           exit 1
         fi
         
