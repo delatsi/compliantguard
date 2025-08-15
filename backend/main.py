@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 import boto3
+from boto3.dynamodb.conditions import Key
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -217,8 +218,32 @@ async def trigger_scan(request: ScanRequest):
 
     print(f"🔍 [PROD] Starting REAL scan for project: {request.project_id}")
 
-    # Check if project has credentials
-    if request.project_id not in UPLOADED_PROJECTS:
+    # Check if project has credentials in DynamoDB first, then fallback to memory
+    project_has_credentials = False
+
+    try:
+        # Check DynamoDB for project credentials
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        gcp_table = dynamodb.Table(
+            os.environ.get("GCP_CREDENTIALS_TABLE", "themisguard-prod-gcp-credentials")
+        )
+        response = gcp_table.get_item(
+            Key={"user_id": MOCK_USER["user_id"], "project_id": request.project_id}
+        )
+        if "Item" in response:
+            project_has_credentials = True
+            print(
+                f"✅ [PROD] Found project credentials in DynamoDB: {request.project_id}"
+            )
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB credential check failed: {e}")
+
+    # Fallback to in-memory storage
+    if not project_has_credentials and request.project_id in UPLOADED_PROJECTS:
+        project_has_credentials = True
+        print(f"✅ [PROD] Found project credentials in memory: {request.project_id}")
+
+    if not project_has_credentials:
         print(f"❌ [PROD] No credentials found for project: {request.project_id}")
         return {
             "scan_id": scan_id,
@@ -358,9 +383,25 @@ async def trigger_scan(request: ScanRequest):
         "status": "completed",
     }
 
-    # Add to our storage
-    MOCK_SCANS.insert(0, scan_summary)
-    SCAN_REPORTS[scan_id] = detailed_report
+    # Store in DynamoDB with fallback to in-memory storage
+    try:
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        scans_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
+
+        # Store scan summary in scans table
+        scans_table.put_item(Item=scan_summary)
+
+        # Store detailed report in scans table with special key
+        detailed_report_item = detailed_report.copy()
+        detailed_report_item["scan_id"] = f"{scan_id}_detailed"
+        scans_table.put_item(Item=detailed_report_item)
+
+        print(f"✅ [PROD] Scan data stored in DynamoDB: {scan_id}")
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB scan storage failed, using fallback: {e}")
+        # Fallback to in-memory storage
+        MOCK_SCANS.insert(0, scan_summary)
+        SCAN_REPORTS[scan_id] = detailed_report
 
     print(f"✅ [PROD] Scan completed: {scan_id} for {request.project_id}")
 
@@ -377,8 +418,21 @@ async def trigger_scan(request: ScanRequest):
 async def get_report(scan_id: str):
     print(f"📄 [PROD] Retrieving report for scan: {scan_id}")
 
+    try:
+        # Try to get from DynamoDB first
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        scans_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
+
+        response = scans_table.get_item(Key={"scan_id": f"{scan_id}_detailed"})
+        if "Item" in response:
+            print(f"✅ [PROD] Found detailed report in DynamoDB for {scan_id}")
+            return response["Item"]
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB read failed, using fallback: {e}")
+
+    # Fallback to in-memory storage
     if scan_id in SCAN_REPORTS:
-        print(f"✅ [PROD] Found stored report for {scan_id}")
+        print(f"✅ [PROD] Found stored report in memory for {scan_id}")
         return SCAN_REPORTS[scan_id]
 
     # Fallback to mock report
@@ -397,16 +451,50 @@ async def get_report(scan_id: str):
 
 @app.get("/api/v1/reports")
 async def list_reports(limit: int = 10, offset: int = 0):
-    print(f"📋 [PROD] Listing reports: {len(MOCK_SCANS)} total reports available")
-    reports_slice = MOCK_SCANS[offset : offset + limit]
-    print(f"📋 [PROD] Returning {len(reports_slice)} reports")
+    print(f"📋 [PROD] Listing reports with limit: {limit}, offset: {offset}")
 
-    return {
-        "reports": reports_slice,
-        "total": len(MOCK_SCANS),
-        "limit": limit,
-        "offset": offset,
-    }
+    try:
+        # Try to get from DynamoDB first
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        scans_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
+
+        # Query all scan summaries (excluding detailed reports)
+        response = scans_table.scan(
+            FilterExpression="attribute_not_exists(violations)",  # Filter out detailed reports
+        )
+
+        scans_from_db = response.get("Items", [])
+
+        # Sort by scan_timestamp descending
+        scans_from_db.sort(key=lambda x: x.get("scan_timestamp", ""), reverse=True)
+
+        total_scans = len(scans_from_db)
+        reports_slice = scans_from_db[offset : offset + limit]
+
+        print(
+            f"📋 [PROD] Found {total_scans} scans in DynamoDB, returning {len(reports_slice)} reports"
+        )
+
+        return {
+            "reports": reports_slice,
+            "total": total_scans,
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB read failed, using fallback: {e}")
+        # Fallback to in-memory storage
+        reports_slice = MOCK_SCANS[offset : offset + limit]
+        print(
+            f"📋 [PROD] Fallback: {len(MOCK_SCANS)} total reports available, returning {len(reports_slice)} reports"
+        )
+
+        return {
+            "reports": reports_slice,
+            "total": len(MOCK_SCANS),
+            "limit": limit,
+            "offset": offset,
+        }
 
 
 @app.get("/api/v1/dashboard")
@@ -414,16 +502,49 @@ async def get_dashboard():
     print("📊 [PROD] Generating live dashboard data...")
 
     # Calculate live statistics from actual scan data
-    total_scans = len(MOCK_SCANS)
-    total_projects = len(UPLOADED_PROJECTS)
+    all_scans = []
+    total_projects = 0
+
+    try:
+        # Try to get data from DynamoDB first
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        scans_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
+        gcp_table = dynamodb.Table(
+            os.environ.get("GCP_CREDENTIALS_TABLE", "themisguard-prod-gcp-credentials")
+        )
+
+        # Get scan summaries
+        scans_response = scans_table.scan(
+            FilterExpression="attribute_not_exists(violations)",  # Filter out detailed reports
+        )
+        all_scans = scans_response.get("Items", [])
+
+        # Get project count
+        projects_response = gcp_table.query(
+            KeyConditionExpression=Key("user_id").eq(MOCK_USER["user_id"])
+        )
+        total_projects = len(projects_response.get("Items", []))
+
+        print(
+            f"📊 [PROD] DynamoDB stats: {len(all_scans)} scans, {total_projects} projects"
+        )
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB dashboard read failed, using fallback: {e}")
+        # Fallback to in-memory storage
+        all_scans = MOCK_SCANS
+        total_projects = len(UPLOADED_PROJECTS)
+
+    total_scans = len(all_scans)
 
     # Calculate overall compliance score from recent scans
-    if MOCK_SCANS:
-        recent_scores = [scan.get("compliance_score", 0) for scan in MOCK_SCANS[:5]]
+    if all_scans:
+        # Sort by scan_timestamp descending
+        all_scans.sort(key=lambda x: x.get("scan_timestamp", ""), reverse=True)
+        recent_scores = [scan.get("compliance_score", 0) for scan in all_scans[:5]]
         overall_compliance_score = (
             sum(recent_scores) / len(recent_scores) if recent_scores else 0
         )
-        last_scan_date = MOCK_SCANS[0]["scan_timestamp"] if MOCK_SCANS else None
+        last_scan_date = all_scans[0]["scan_timestamp"] if all_scans else None
     else:
         overall_compliance_score = 0
         last_scan_date = None
@@ -436,11 +557,26 @@ async def get_dashboard():
     low_violations = 0
 
     # Look at the most recent detailed reports to get violation breakdown
-    recent_report_ids = [scan["scan_id"] for scan in MOCK_SCANS[:3]]
+    recent_report_ids = [scan["scan_id"] for scan in all_scans[:3]]
     for scan_id in recent_report_ids:
-        if scan_id in SCAN_REPORTS:
-            report = SCAN_REPORTS[scan_id]
-            violations = report.get("violations", [])
+        detailed_report = None
+
+        try:
+            # Try DynamoDB first
+            dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+            scans_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
+            response = scans_table.get_item(Key={"scan_id": f"{scan_id}_detailed"})
+            if "Item" in response:
+                detailed_report = response["Item"]
+        except Exception as e:
+            print(f"⚠️ [PROD] DynamoDB detailed report read failed: {e}")
+
+        # Fallback to in-memory storage
+        if not detailed_report and scan_id in SCAN_REPORTS:
+            detailed_report = SCAN_REPORTS[scan_id]
+
+        if detailed_report:
+            violations = detailed_report.get("violations", [])
             total_violations += len(violations)
 
             for violation in violations:
@@ -463,7 +599,7 @@ async def get_dashboard():
         "total_scans": total_scans,
         "total_projects": total_projects,
         "overall_compliance_score": round(overall_compliance_score, 1),
-        "recent_scans": MOCK_SCANS[:3],
+        "recent_scans": all_scans[:3],
         "last_scan_date": last_scan_date,
         "violation_summary": {
             "total_violations": total_violations,
@@ -497,16 +633,32 @@ async def upload_gcp_credentials_file(
         service_account_email = service_account_json.get("client_email", "unknown")
         print(f"✅ [PROD] Valid service account: {service_account_email}")
 
-        # Store the project in our in-memory storage
+        # Store the project in DynamoDB
         current_time = datetime.utcnow().isoformat() + "Z"
 
-        UPLOADED_PROJECTS[project_id] = {
+        project_data = {
+            "user_id": MOCK_USER["user_id"],
             "project_id": project_id,
             "service_account_email": service_account_email,
             "status": "active",
             "created_at": current_time,
             "last_used": current_time,
         }
+
+        # Store in DynamoDB
+        try:
+            dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+            gcp_table = dynamodb.Table(
+                os.environ.get(
+                    "GCP_CREDENTIALS_TABLE", "themisguard-prod-gcp-credentials"
+                )
+            )
+            gcp_table.put_item(Item=project_data)
+            print(f"✅ [PROD] Project stored in DynamoDB: {project_id}")
+        except Exception as e:
+            print(f"⚠️ [PROD] DynamoDB storage failed, using fallback: {e}")
+            # Fallback to in-memory storage
+            UPLOADED_PROJECTS[project_id] = project_data
 
         return {
             "message": "GCP credentials uploaded successfully (production mode)",
@@ -526,10 +678,28 @@ async def list_gcp_projects():
     """List GCP projects"""
     print("📋 [PROD] Listing GCP projects")
 
-    projects = list(UPLOADED_PROJECTS.values())
-    print(f"📋 [PROD] Found {len(projects)} uploaded projects")
+    try:
+        # Read from DynamoDB
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        gcp_table = dynamodb.Table(
+            os.environ.get("GCP_CREDENTIALS_TABLE", "themisguard-prod-gcp-credentials")
+        )
 
-    return projects
+        # Query by user_id (partition key)
+        response = gcp_table.query(
+            KeyConditionExpression=Key("user_id").eq(MOCK_USER["user_id"])
+        )
+        projects = response.get("Items", [])
+        print(
+            f"📋 [PROD] Found {len(projects)} projects in DynamoDB for user {MOCK_USER['user_id']}"
+        )
+        return projects
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB read failed, using fallback: {e}")
+        # Fallback to in-memory storage
+        projects = list(UPLOADED_PROJECTS.values())
+        print(f"📋 [PROD] Found {len(projects)} uploaded projects (fallback)")
+        return projects
 
 
 @app.delete("/api/v1/gcp/projects/{project_id}/credentials")
@@ -537,11 +707,24 @@ async def revoke_gcp_credentials(project_id: str):
     """Revoke GCP credentials"""
     print(f"🗑️ [PROD] Revoking credentials for project: {project_id}")
 
-    if project_id in UPLOADED_PROJECTS:
-        del UPLOADED_PROJECTS[project_id]
-        print(f"✅ [PROD] Project {project_id} removed from storage")
-    else:
-        print(f"⚠️ [PROD] Project {project_id} not found in storage")
+    try:
+        # Remove from DynamoDB
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        gcp_table = dynamodb.Table(
+            os.environ.get("GCP_CREDENTIALS_TABLE", "themisguard-prod-gcp-credentials")
+        )
+        gcp_table.delete_item(
+            Key={"user_id": MOCK_USER["user_id"], "project_id": project_id}
+        )
+        print(f"✅ [PROD] Project {project_id} removed from DynamoDB")
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB delete failed, using fallback: {e}")
+        # Fallback to in-memory storage
+        if project_id in UPLOADED_PROJECTS:
+            del UPLOADED_PROJECTS[project_id]
+            print(f"✅ [PROD] Project {project_id} removed from memory (fallback)")
+        else:
+            print(f"⚠️ [PROD] Project {project_id} not found in storage")
 
     return {
         "message": f"GCP credentials revoked for project {project_id}",

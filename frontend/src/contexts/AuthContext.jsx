@@ -77,9 +77,11 @@ export const AuthProvider = ({ children }) => {
       const data = response.data;
       const token = data.access_token || data.token;
       const user = {
-        id: data.user_id,
-        email: data.email,
-        role: data.role
+        id: data.user.user_id,
+        email: data.user.email,
+        first_name: data.user.first_name,
+        last_name: data.user.last_name,
+        role: data.user.role || 'user'
       };
       
       localStorage.setItem('token', token);
