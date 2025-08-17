@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -80,6 +80,39 @@ export const gcpAPI = {
   
   // Revoke GCP credentials
   revokeCredentials: (projectId) => api.delete(`/api/v1/gcp/projects/${projectId}/credentials`),
+};
+
+// Documentation API
+export const documentationAPI = {
+  // List user documentation
+  listDocuments: (complianceLevel = null) => {
+    const params = complianceLevel ? `?compliance_level=${complianceLevel}` : '';
+    return api.get(`/api/v1/documentation${params}`);
+  },
+  
+  // Get specific document content
+  getDocument: (documentId) => api.get(`/api/v1/documentation/${documentId}`),
+  
+  // Generate compliance-specific documentation
+  generateDocuments: () => api.post('/api/v1/documentation/generate', {}),
+};
+
+// Compliance Roadmap API
+export const roadmapAPI = {
+  // Get complete compliance roadmap with user progress
+  getRoadmap: () => api.get('/api/v1/roadmap'),
+  
+  // Update milestone progress
+  updateMilestone: (milestoneId, status, notes = '', completionDate = null) => 
+    api.put('/api/v1/roadmap/milestone', {
+      milestone_id: milestoneId,
+      status: status,
+      notes: notes,
+      completion_date: completionDate
+    }),
+  
+  // Get progress summary and analytics
+  getProgressSummary: () => api.get('/api/v1/roadmap/progress'),
 };
 
 export default api;

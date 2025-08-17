@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { documentationAPI } from '../services/api';
 import { 
   DocumentTextIcon,
   PlusIcon,
@@ -24,6 +25,45 @@ const Documentation = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('updated');
+  const [userDocuments, setUserDocuments] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchUserDocumentation = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await documentationAPI.listDocuments();
+      setUserDocuments(response.data.documents || []);
+      
+      // If no documents exist, generate them
+      if (response.data.documents.length === 0) {
+        await generateDocuments();
+      }
+    } catch (error) {
+      console.error('Failed to load user documentation:', error);
+      setUserDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load user documentation when not in demo mode
+  useEffect(() => {
+    if (!isDemoMode) {
+      fetchUserDocumentation();
+    }
+  }, [isDemoMode, fetchUserDocumentation]);
+
+  const generateDocuments = async () => {
+    try {
+      setLoading(true);
+      const response = await documentationAPI.generateDocuments();
+      setUserDocuments(response.data.documents || []);
+    } catch (error) {
+      console.error('Failed to generate documentation:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Demo documentation data
   const documentCategories = [
@@ -122,11 +162,16 @@ const Documentation = () => {
     }
   ];
 
-  const filteredDocuments = demoDocuments.filter(doc => {
+  // Use demo data in demo mode, real user data otherwise
+  const documentsToShow = isDemoMode ? demoDocuments : userDocuments;
+  
+  const filteredDocuments = documentsToShow.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doc.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doc.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
+                         (doc.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (doc.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = selectedCategory === 'all' || 
+                           doc.category === selectedCategory ||
+                           doc.document_type === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -189,10 +234,22 @@ const Documentation = () => {
           </p>
         </div>
         <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-            <CloudArrowUpIcon className="h-4 w-4 mr-2" />
-            Sync with GitHub
-          </button>
+          {!isDemoMode && (
+            <button 
+              onClick={generateDocuments}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              <DocumentArrowUpIcon className="h-4 w-4 mr-2" />
+              {loading ? 'Generating...' : 'Generate Compliance Docs'}
+            </button>
+          )}
+          {isDemoMode && (
+            <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+              <CloudArrowUpIcon className="h-4 w-4 mr-2" />
+              Sync with GitHub
+            </button>
+          )}
           <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700">
             <PlusIcon className="h-4 w-4 mr-2" />
             New Document

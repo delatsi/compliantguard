@@ -13,6 +13,8 @@ Globals:
         DYNAMODB_TABLE_NAME: !Sub "${ProjectName}-${Environment}-scans"
         S3_BUCKET_NAME: !Sub "${ProjectName}-${Environment}-reports-${AWS::AccountId}"
         GCP_CREDENTIALS_TABLE: !Sub "${ProjectName}-${Environment}-gcp-credentials"
+        DOCUMENTATION_TABLE: !Sub "${ProjectName}-${Environment}-documentation"
+        ROADMAP_TABLE: !Sub "${ProjectName}-${Environment}-roadmap"
         KMS_KEY_ALIAS: !Sub "alias/${ProjectName}-${Environment}-gcp-credentials"
         JWT_SECRET_KEY: !Ref JWTSecretKey
         GCP_PROJECT_ID: !Ref GCPProjectId
@@ -129,6 +131,10 @@ Resources:
             TableName: !Ref WebhookEventsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref GCPCredentialsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DocumentationTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RoadmapTable
         - S3CrudPolicy:
             BucketName: !Ref ReportsBucket
         - Version: '2012-10-17'
@@ -148,6 +154,8 @@ Resources:
                 - !Sub "${InvoicesTable.Arn}/index/*"
                 - !Sub "${WebhookEventsTable.Arn}/index/*"
                 - !Sub "${GCPCredentialsTable.Arn}/index/*"
+                - !Sub "${DocumentationTable.Arn}/index/*"
+                - !Sub "${RoadmapTable.Arn}/index/*"
             - Effect: Allow
               Action:
                 - kms:Encrypt
@@ -536,6 +544,118 @@ Resources:
           Value: delatsi-llc
         - Key: DataClassification
           Value: operational
+
+  # Documentation Table (for user-specific compliance documentation)
+  DocumentationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-documentation"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: document_id
+          AttributeType: S
+        - AttributeName: compliance_level
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: document_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: compliance-level-index
+          KeySchema:
+            - AttributeName: compliance_level
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      DeletionProtectionEnabled: !If [IsProduction, true, false]
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: documentation
+        - Key: Tier
+          Value: !If [IsProduction, "production", "development"]
+        - Key: Owner
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+        - Key: Application
+          Value: !Ref ProjectName
+        - Key: DataClassification
+          Value: compliance-documentation
+
+  # Compliance Roadmap Table (for user milestone tracking)
+  RoadmapTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-roadmap"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: milestone_id
+          AttributeType: S
+        - AttributeName: phase
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: milestone_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: phase-index
+          KeySchema:
+            - AttributeName: phase
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: user-phase-index
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+            - AttributeName: phase
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      DeletionProtectionEnabled: !If [IsProduction, true, false]
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: compliance
+        - Key: Tier
+          Value: !If [IsProduction, "production", "development"]
+        - Key: Owner
+          Value: DevOps
+        - Key: CostCenter
+          Value: Engineering
+        - Key: Application
+          Value: !Ref ProjectName
+        - Key: DataClassification
+          Value: compliance-tracking
 
   # GCP Credentials Table (for encrypted credential storage)
   GCPCredentialsTable:

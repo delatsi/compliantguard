@@ -64,6 +64,14 @@ logs/
 .aws-sam/
 samconfig.toml.bak
 
+# Lambda deployment packages
+lambda_deployment.zip
+lambda_deployment_with_deps.zip
+lambda_env.json
+
+# Python package dependencies for Lambda
+backend/package/
+
 # Node.js (frontend)
 node_modules/
 npm-debug.log*
@@ -73,6 +81,10 @@ yarn-error.log*
 # Build outputs
 frontend/dist/
 frontend/build/
+
+# Test outputs
+frontend/test-results/
+frontend/playwright-report/
 
 # Husky internals (commit the hooks, not the internals)
 .husky/_

@@ -9,6 +9,7 @@ import {
   FolderIcon,
   Cog6ToothIcon,
   CreditCardIcon,
+  ChartBarIcon,
   Bars3Icon,
   XMarkIcon,
   UserCircleIcon,
@@ -25,6 +26,7 @@ const Layout = () => {
     { name: 'Scan Project', href: '/app/scan', icon: DocumentMagnifyingGlassIcon },
     { name: 'Reports', href: '/app/reports', icon: DocumentTextIcon },
     { name: 'Documentation', href: '/app/documentation', icon: FolderIcon },
+    { name: 'Roadmap', href: '/app/roadmap', icon: ChartBarIcon },
     { name: 'Billing', href: '/app/subscription', icon: CreditCardIcon },
     { name: 'Settings', href: '/app/settings', icon: Cog6ToothIcon },
   ];

@@ -7,6 +7,7 @@ import {
   DocumentTextIcon,
   FolderIcon,
   Cog6ToothIcon,
+  ChartBarIcon,
   Bars3Icon,
   XMarkIcon,
   UserCircleIcon,
@@ -27,6 +28,7 @@ const DemoLayout = () => {
     { name: 'Scan Project', href: '/demo/scan', icon: DocumentMagnifyingGlassIcon },
     { name: 'Reports', href: '/demo/reports', icon: DocumentTextIcon },
     { name: 'Documentation', href: '/demo/documentation', icon: FolderIcon },
+    { name: 'Roadmap', href: '/demo/roadmap', icon: ChartBarIcon },
     { name: 'Settings', href: '/demo/settings', icon: Cog6ToothIcon },
   ];
 

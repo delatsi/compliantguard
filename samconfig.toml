@@ -79,12 +79,5 @@ capabilities = "CAPABILITY_IAM"
 parameter_overrides = [
     "Environment=prod",
     "ProjectName=themisguard",
-    "JWTSecretKey=your-secret-key-change-in-production",
-    "GCPProjectId=",
-    "GoogleClientId=",
-    "StripeSecretKey=sk_live_...",
-    "StripePublishableKey=pk_live_...",
-    "StripeWebhookSecret=whsec_...",
-    "CustomDomainName=api.themisguard.com",
-    "SSLCertificateArn=arn:aws:acm:us-east-1:YOUR_ACCOUNT:certificate/YOUR_CERT_ID"
+    "JWTSecretKey=your-secret-key-change-in-production"
 ]

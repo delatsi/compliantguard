@@ -7,11 +7,14 @@ Production version with dev server functionality
 import json
 import os
 from datetime import datetime
+from typing import Optional
 
 import boto3
+import jwt
 from boto3.dynamodb.conditions import Key
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from mangum import Mangum
 from pydantic import BaseModel
 
@@ -27,17 +30,12 @@ class Settings:
     AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
     DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "themisguard-scans")
     S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "themisguard-storage")
+    JWT_SECRET_KEY = os.environ.get(
+        "JWT_SECRET_KEY", "your-secret-key-change-in-production"
+    )
 
 
 settings = Settings()
-
-# Mock data for development compatibility
-MOCK_USER = {
-    "user_id": "prod-user-123",
-    "email": "user@themisguard.com",
-    "first_name": "Production",
-    "last_name": "User",
-}
 
 # In-memory storage for uploaded GCP projects (production fallback)
 UPLOADED_PROJECTS = {}
@@ -46,6 +44,84 @@ UPLOADED_PROJECTS = {}
 SCAN_REPORTS = {}
 
 MOCK_SCANS = []
+
+# In-memory storage for roadmap progress (development fallback)
+ROADMAP_PROGRESS = {}
+
+# Authentication
+security = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    """Extract user information from JWT token"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # For development, create a user object from token
+        user = {
+            "user_id": user_id,
+            "email": payload.get("email", "user@example.com"),
+            "first_name": payload.get("first_name", "User"),
+            "last_name": payload.get("last_name", "Name"),
+        }
+
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_current_user_optional(
+    authorization: Optional[str] = Header(None),
+) -> dict:
+    """Get current user but allow endpoints to work without auth for development"""
+    if not authorization:
+        # Return development user for testing
+        return {
+            "user_id": "dev-user-123",
+            "email": "admin@themisguard.com",
+            "first_name": "Development",
+            "last_name": "User",
+        }
+
+    try:
+        token = authorization.replace("Bearer ", "")
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+
+        user_id = payload.get("user_id")
+        if not user_id:
+            # Return development user for testing
+            return {
+                "user_id": "dev-user-123",
+                "email": "admin@themisguard.com",
+                "first_name": "Development",
+                "last_name": "User",
+            }
+
+        user = {
+            "user_id": user_id,
+            "email": payload.get("email", "user@example.com"),
+            "first_name": payload.get("first_name", "User"),
+            "last_name": payload.get("last_name", "Name"),
+        }
+
+        return user
+    except Exception:
+        # Return development user for testing
+        return {
+            "user_id": "dev-user-123",
+            "email": "admin@themisguard.com",
+            "first_name": "Development",
+            "last_name": "User",
+        }
 
 
 # Request/Response Models
@@ -65,11 +141,6 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     company: str = ""
-
-
-# Mock authentication for production fallback
-async def mock_get_current_user():
-    return MOCK_USER
 
 
 # Create FastAPI app
@@ -161,17 +232,40 @@ async def login(request: AuthRequest):
     print(f"🔐 [PROD] Has password: {bool(request.password)}")
     print(f"🕰️ [PROD] Timestamp: {datetime.utcnow().isoformat()}")
 
-    # Production authentication would integrate with AWS Cognito
-    response = {
-        "user": MOCK_USER,
-        "token": "prod-jwt-token",
-        "message": "Login successful (production mode)",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
+    # Simple auth check for development
+    if request.email == "admin@themisguard.com" and request.password == "password123":
+        # Create user data
+        user_data = {
+            "user_id": "user-admin-123",
+            "email": request.email,
+            "first_name": "Admin",
+            "last_name": "User",
+        }
 
-    print("✅ [PROD] Login successful")
-    print(f"👤 [PROD] User: {MOCK_USER['user_id']}")
-    return response
+        # Create JWT token
+        token_payload = {
+            **user_data,
+            "exp": datetime.utcnow().timestamp() + 86400,  # 24 hours
+        }
+
+        access_token = jwt.encode(
+            token_payload, settings.JWT_SECRET_KEY, algorithm="HS256"
+        )
+
+        response = {
+            "user": user_data,
+            "access_token": access_token,
+            "token_type": "bearer",
+            "message": "Login successful (production mode)",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        print("✅ [PROD] Login successful")
+        print(f"👤 [PROD] User: {user_data['user_id']}")
+        return response
+    else:
+        print("❌ [PROD] Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
 @app.post("/api/v1/auth/register")
@@ -191,24 +285,26 @@ async def register(request: RegisterRequest):
 
 
 @app.get("/api/v1/auth/verify")
-async def verify_token():
+async def verify_token(current_user: dict = Depends(get_current_user)):
     print("🔍 [PROD] Token verification request")
     print(f"🕰️ [PROD] Timestamp: {datetime.utcnow().isoformat()}")
 
     response = {
-        "user": MOCK_USER,
+        "user": current_user,
         "timestamp": datetime.utcnow().isoformat(),
         "valid": True,
     }
 
     print("✅ [PROD] Token verification successful")
-    print(f"👤 [PROD] User: {MOCK_USER['user_id']}")
+    print(f"👤 [PROD] User: {current_user['user_id']}")
     return response
 
 
 # Scanning endpoints
 @app.post("/api/v1/scan")
-async def trigger_scan(request: ScanRequest):
+async def trigger_scan(
+    request: ScanRequest, current_user: dict = Depends(get_current_user_optional)
+):
     """Trigger comprehensive HIPAA compliance scan"""
     from datetime import datetime
 
@@ -228,7 +324,7 @@ async def trigger_scan(request: ScanRequest):
             os.environ.get("GCP_CREDENTIALS_TABLE", "themisguard-prod-gcp-credentials")
         )
         response = gcp_table.get_item(
-            Key={"user_id": MOCK_USER["user_id"], "project_id": request.project_id}
+            Key={"user_id": current_user["user_id"], "project_id": request.project_id}
         )
         if "Item" in response:
             project_has_credentials = True
@@ -374,7 +470,7 @@ async def trigger_scan(request: ScanRequest):
     # Store detailed report for individual report retrieval
     detailed_report = {
         "scan_id": scan_id,
-        "user_id": MOCK_USER["user_id"],
+        "user_id": current_user["user_id"],
         "project_id": request.project_id,
         "scan_timestamp": current_time,
         "violations": violations,
@@ -415,7 +511,9 @@ async def trigger_scan(request: ScanRequest):
 
 
 @app.get("/api/v1/reports/{scan_id}")
-async def get_report(scan_id: str):
+async def get_report(
+    scan_id: str, current_user: dict = Depends(get_current_user_optional)
+):
     print(f"📄 [PROD] Retrieving report for scan: {scan_id}")
 
     try:
@@ -439,7 +537,7 @@ async def get_report(scan_id: str):
     print(f"⚠️ [PROD] No stored report found for {scan_id}, returning mock data")
     return {
         "scan_id": scan_id,
-        "user_id": MOCK_USER["user_id"],
+        "user_id": current_user["user_id"],
         "project_id": "mock-project",
         "scan_timestamp": datetime.utcnow().isoformat(),
         "violations": [],
@@ -498,7 +596,7 @@ async def list_reports(limit: int = 10, offset: int = 0):
 
 
 @app.get("/api/v1/dashboard")
-async def get_dashboard():
+async def get_dashboard(current_user: dict = Depends(get_current_user_optional)):
     print("📊 [PROD] Generating live dashboard data...")
 
     # Calculate live statistics from actual scan data
@@ -521,7 +619,7 @@ async def get_dashboard():
 
         # Get project count
         projects_response = gcp_table.query(
-            KeyConditionExpression=Key("user_id").eq(MOCK_USER["user_id"])
+            KeyConditionExpression=Key("user_id").eq(current_user["user_id"])
         )
         total_projects = len(projects_response.get("Items", []))
 
@@ -595,7 +693,7 @@ async def get_dashboard():
     )
 
     return {
-        "user_id": MOCK_USER["user_id"],
+        "user_id": current_user["user_id"],
         "total_scans": total_scans,
         "total_projects": total_projects,
         "overall_compliance_score": round(overall_compliance_score, 1),
@@ -614,7 +712,9 @@ async def get_dashboard():
 # GCP Credential Management Routes
 @app.post("/api/v1/gcp/credentials/upload")
 async def upload_gcp_credentials_file(
-    project_id: str = Form(...), file: UploadFile = File(...)
+    project_id: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_optional),
 ):
     """Upload GCP service account JSON file"""
 
@@ -637,7 +737,7 @@ async def upload_gcp_credentials_file(
         current_time = datetime.utcnow().isoformat() + "Z"
 
         project_data = {
-            "user_id": MOCK_USER["user_id"],
+            "user_id": current_user["user_id"],
             "project_id": project_id,
             "service_account_email": service_account_email,
             "status": "active",
@@ -674,7 +774,7 @@ async def upload_gcp_credentials_file(
 
 
 @app.get("/api/v1/gcp/projects")
-async def list_gcp_projects():
+async def list_gcp_projects(current_user: dict = Depends(get_current_user_optional)):
     """List GCP projects"""
     print("📋 [PROD] Listing GCP projects")
 
@@ -687,11 +787,11 @@ async def list_gcp_projects():
 
         # Query by user_id (partition key)
         response = gcp_table.query(
-            KeyConditionExpression=Key("user_id").eq(MOCK_USER["user_id"])
+            KeyConditionExpression=Key("user_id").eq(current_user["user_id"])
         )
         projects = response.get("Items", [])
         print(
-            f"📋 [PROD] Found {len(projects)} projects in DynamoDB for user {MOCK_USER['user_id']}"
+            f"📋 [PROD] Found {len(projects)} projects in DynamoDB for user {current_user['user_id']}"
         )
         return projects
     except Exception as e:
@@ -703,7 +803,9 @@ async def list_gcp_projects():
 
 
 @app.delete("/api/v1/gcp/projects/{project_id}/credentials")
-async def revoke_gcp_credentials(project_id: str):
+async def revoke_gcp_credentials(
+    project_id: str, current_user: dict = Depends(get_current_user_optional)
+):
     """Revoke GCP credentials"""
     print(f"🗑️ [PROD] Revoking credentials for project: {project_id}")
 
@@ -714,7 +816,7 @@ async def revoke_gcp_credentials(project_id: str):
             os.environ.get("GCP_CREDENTIALS_TABLE", "themisguard-prod-gcp-credentials")
         )
         gcp_table.delete_item(
-            Key={"user_id": MOCK_USER["user_id"], "project_id": project_id}
+            Key={"user_id": current_user["user_id"], "project_id": project_id}
         )
         print(f"✅ [PROD] Project {project_id} removed from DynamoDB")
     except Exception as e:
@@ -742,6 +844,762 @@ async def check_gcp_project_status(project_id: str):
         "service_account_email": f"scanner@{project_id}.iam.gserviceaccount.com",
         "connection_status": "connected",
     }
+
+
+# Documentation Management Routes
+@app.get("/api/v1/documentation")
+async def list_user_documentation(
+    compliance_level: str = None,
+    current_user: dict = Depends(get_current_user_optional),
+):
+    """List user-specific documentation based on compliance level"""
+    print(f"📚 [PROD] Listing documentation for user: {current_user['user_id']}")
+
+    try:
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        docs_table = dynamodb.Table(
+            os.environ.get("DOCUMENTATION_TABLE", "themisguard-prod-documentation")
+        )
+
+        # Query by user_id
+        response = docs_table.query(
+            KeyConditionExpression=Key("user_id").eq(current_user["user_id"])
+        )
+        user_docs = response.get("Items", [])
+
+        # Filter by compliance level if specified
+        if compliance_level:
+            user_docs = [
+                doc
+                for doc in user_docs
+                if doc.get("compliance_level") == compliance_level
+            ]
+
+        print(f"📚 [PROD] Found {len(user_docs)} documents for user")
+        return {"documents": user_docs, "total": len(user_docs)}
+
+    except Exception as e:
+        print(f"⚠️ [PROD] DynamoDB documentation read failed: {e}")
+        # Return empty for now, will be populated by template migration
+        return {"documents": [], "total": 0}
+
+
+@app.post("/api/v1/documentation/generate")
+async def generate_compliance_documentation(
+    request: dict, current_user: dict = Depends(get_current_user_optional)
+):
+    """Generate user-specific compliance documentation based on scan results"""
+    print(f"📝 [PROD] Generating documentation for user: {current_user['user_id']}")
+
+    try:
+        # Get user's latest scan results to determine compliance level
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        scans_table = dynamodb.Table(settings.DYNAMODB_TABLE_NAME)
+        docs_table = dynamodb.Table(
+            os.environ.get("DOCUMENTATION_TABLE", "themisguard-prod-documentation")
+        )
+
+        # Get user's most recent scan to determine compliance level
+        scans_response = scans_table.scan(
+            FilterExpression="attribute_not_exists(violations)",
+        )
+        user_scans = scans_response.get("Items", [])
+
+        # Calculate compliance level
+        if user_scans:
+            latest_scan = max(user_scans, key=lambda x: x.get("scan_timestamp", ""))
+            compliance_score = latest_scan.get("compliance_score", 0)
+
+            if compliance_score >= 90:
+                compliance_level = "high"
+            elif compliance_score >= 75:
+                compliance_level = "medium"
+            else:
+                compliance_level = "low"
+        else:
+            compliance_level = "initial"
+
+        # Generate document metadata based on compliance level
+        current_time = datetime.utcnow().isoformat() + "Z"
+        document_id = f"doc-{datetime.now().timestamp()}"
+
+        doc_templates = {
+            "high": [
+                {
+                    "title": "Advanced HIPAA Implementation Guide",
+                    "type": "implementation_guide",
+                },
+                {"title": "Continuous Monitoring Procedures", "type": "procedures"},
+                {"title": "Risk Assessment Framework", "type": "framework"},
+            ],
+            "medium": [
+                {"title": "HIPAA Compliance Roadmap", "type": "roadmap"},
+                {
+                    "title": "Security Controls Implementation",
+                    "type": "implementation_guide",
+                },
+                {"title": "Incident Response Plan", "type": "procedures"},
+            ],
+            "low": [
+                {"title": "HIPAA Quick Start Guide", "type": "getting_started"},
+                {"title": "Critical Security Fixes", "type": "remediation"},
+                {"title": "Basic Access Controls", "type": "implementation_guide"},
+            ],
+            "initial": [
+                {"title": "HIPAA Compliance Overview", "type": "overview"},
+                {"title": "Getting Started Checklist", "type": "checklist"},
+                {"title": "Essential Security Policies", "type": "policies"},
+            ],
+        }
+
+        # Create documentation records
+        generated_docs = []
+        for template in doc_templates.get(compliance_level, []):
+            doc_data = {
+                "user_id": current_user["user_id"],
+                "document_id": f"{document_id}-{template['type']}",
+                "title": template["title"],
+                "document_type": template["type"],
+                "compliance_level": compliance_level,
+                "status": "generated",
+                "s3_path": f"documentation/{current_user['user_id']}/{compliance_level}/{template['type']}.md",
+                "created_at": current_time,
+                "updated_at": current_time,
+                "auto_generated": True,
+                "based_on_scan": latest_scan.get("scan_id") if user_scans else None,
+            }
+
+            docs_table.put_item(Item=doc_data)
+            generated_docs.append(doc_data)
+
+        print(
+            f"📚 [PROD] Generated {len(generated_docs)} documents for compliance level: {compliance_level}"
+        )
+        return {"documents": generated_docs, "compliance_level": compliance_level}
+
+    except Exception as e:
+        print(f"❌ [PROD] Documentation generation failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Documentation generation failed: {str(e)}"
+        )
+
+
+@app.get("/api/v1/documentation/{document_id}")
+async def get_document_content(
+    document_id: str, current_user: dict = Depends(get_current_user_optional)
+):
+    """Get specific document content from S3"""
+    print(f"📄 [PROD] Retrieving document: {document_id}")
+
+    try:
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        docs_table = dynamodb.Table(
+            os.environ.get("DOCUMENTATION_TABLE", "themisguard-prod-documentation")
+        )
+
+        # Get document metadata
+        response = docs_table.get_item(
+            Key={"user_id": current_user["user_id"], "document_id": document_id}
+        )
+
+        if "Item" not in response:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        doc_metadata = response["Item"]
+        s3_path = doc_metadata.get("s3_path")
+
+        if s3_path:
+            # Get content from S3
+            s3 = boto3.client("s3", region_name=settings.AWS_REGION)
+            try:
+                s3_response = s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=s3_path)
+                content = s3_response["Body"].read().decode("utf-8")
+                doc_metadata["content"] = content
+            except Exception as s3_error:
+                print(f"⚠️ [PROD] S3 content retrieval failed: {s3_error}")
+                doc_metadata["content"] = "Document content is being generated..."
+
+        return doc_metadata
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [PROD] Document retrieval failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Document retrieval failed: {str(e)}"
+        )
+
+
+# ===========================
+# COMPLIANCE ROADMAP API
+# ===========================
+
+# Generic HIPAA compliance roadmap based on industry best practices
+COMPLIANCE_ROADMAP_TEMPLATE = {
+    "phase_1": {
+        "name": "Legal & Policy Foundation",
+        "description": "Establish legal foundation and organizational structure for HIPAA compliance",
+        "timeline": "Weeks 1-4",
+        "milestones": [
+            {
+                "id": "p1_m1",
+                "title": "Conduct Initial HIPAA Risk Assessment",
+                "description": "Comprehensive assessment of current compliance posture and regulatory gaps",
+                "required": True,
+                "estimated_hours": 16,
+            },
+            {
+                "id": "p1_m2",
+                "title": "Designate HIPAA Security Officer",
+                "description": "Assign dedicated personnel for HIPAA compliance oversight and accountability",
+                "required": True,
+                "estimated_hours": 8,
+            },
+            {
+                "id": "p1_m3",
+                "title": "Develop HIPAA Policies and Procedures",
+                "description": "Create comprehensive HIPAA policies covering administrative, physical, and technical safeguards",
+                "required": True,
+                "estimated_hours": 40,
+            },
+            {
+                "id": "p1_m4",
+                "title": "Establish Business Associate Agreements",
+                "description": "Identify and execute BAAs with all third-party vendors handling PHI",
+                "required": True,
+                "estimated_hours": 24,
+            },
+            {
+                "id": "p1_m5",
+                "title": "Create Incident Response Framework",
+                "description": "Develop procedures for detecting, reporting, and responding to security incidents",
+                "required": True,
+                "estimated_hours": 32,
+            },
+        ],
+    },
+    "phase_2": {
+        "name": "Technical Implementation",
+        "description": "Implement technical safeguards and security controls for PHI protection",
+        "timeline": "Weeks 5-12",
+        "milestones": [
+            {
+                "id": "p2_m1",
+                "title": "Implement Access Controls",
+                "description": "Deploy role-based access controls, multi-factor authentication, and user provisioning",
+                "required": True,
+                "estimated_hours": 56,
+            },
+            {
+                "id": "p2_m2",
+                "title": "Enable Data Encryption",
+                "description": "Implement encryption at rest and in transit for all PHI data",
+                "required": True,
+                "estimated_hours": 48,
+            },
+            {
+                "id": "p2_m3",
+                "title": "Deploy Audit Logging",
+                "description": "Configure comprehensive audit logging for all PHI access and system activities",
+                "required": True,
+                "estimated_hours": 40,
+            },
+            {
+                "id": "p2_m4",
+                "title": "Network Security Controls",
+                "description": "Implement firewalls, network segmentation, and intrusion detection systems",
+                "required": True,
+                "estimated_hours": 64,
+            },
+            {
+                "id": "p2_m5",
+                "title": "Backup and Recovery Systems",
+                "description": "Establish automated backup systems and test recovery procedures",
+                "required": True,
+                "estimated_hours": 32,
+            },
+        ],
+    },
+    "phase_3": {
+        "name": "Training & Human Elements",
+        "description": "Educate workforce and establish compliance culture",
+        "timeline": "Weeks 9-16",
+        "milestones": [
+            {
+                "id": "p3_m1",
+                "title": "Conduct HIPAA Training Program",
+                "description": "Deliver comprehensive HIPAA training to all workforce members",
+                "required": True,
+                "estimated_hours": 24,
+            },
+            {
+                "id": "p3_m2",
+                "title": "Implement Workforce Clearance Procedures",
+                "description": "Establish background check and clearance procedures for PHI access",
+                "required": True,
+                "estimated_hours": 16,
+            },
+            {
+                "id": "p3_m3",
+                "title": "Create Information Access Management",
+                "description": "Implement procedures for granting and revoking PHI access based on job functions",
+                "required": True,
+                "estimated_hours": 32,
+            },
+            {
+                "id": "p3_m4",
+                "title": "Establish Security Awareness Program",
+                "description": "Develop ongoing security awareness training and phishing simulation programs",
+                "required": False,
+                "estimated_hours": 20,
+            },
+        ],
+    },
+    "phase_4": {
+        "name": "Operational Security",
+        "description": "Establish ongoing security operations and monitoring",
+        "timeline": "Weeks 13-20",
+        "milestones": [
+            {
+                "id": "p4_m1",
+                "title": "Deploy Security Monitoring",
+                "description": "Implement 24/7 security monitoring and alerting systems",
+                "required": True,
+                "estimated_hours": 48,
+            },
+            {
+                "id": "p4_m2",
+                "title": "Conduct Vulnerability Management",
+                "description": "Establish regular vulnerability scanning and remediation processes",
+                "required": True,
+                "estimated_hours": 32,
+            },
+            {
+                "id": "p4_m3",
+                "title": "Implement Physical Safeguards",
+                "description": "Secure physical access to systems containing PHI",
+                "required": True,
+                "estimated_hours": 24,
+            },
+            {
+                "id": "p4_m4",
+                "title": "Establish Data Loss Prevention",
+                "description": "Deploy DLP solutions to prevent unauthorized PHI disclosure",
+                "required": False,
+                "estimated_hours": 40,
+            },
+        ],
+    },
+    "phase_5": {
+        "name": "Documentation & Evidence",
+        "description": "Create comprehensive documentation and evidence collection",
+        "timeline": "Weeks 17-24",
+        "milestones": [
+            {
+                "id": "p5_m1",
+                "title": "Document Security Measures",
+                "description": "Create detailed documentation of all implemented security measures",
+                "required": True,
+                "estimated_hours": 32,
+            },
+            {
+                "id": "p5_m2",
+                "title": "Maintain Compliance Evidence",
+                "description": "Establish systems for collecting and maintaining compliance evidence",
+                "required": True,
+                "estimated_hours": 24,
+            },
+            {
+                "id": "p5_m3",
+                "title": "Conduct Internal Audit",
+                "description": "Perform comprehensive internal HIPAA compliance audit",
+                "required": True,
+                "estimated_hours": 40,
+            },
+            {
+                "id": "p5_m4",
+                "title": "Prepare for External Assessment",
+                "description": "Ready organization for third-party compliance assessment",
+                "required": False,
+                "estimated_hours": 16,
+            },
+        ],
+    },
+    "phase_6": {
+        "name": "Ongoing Compliance",
+        "description": "Maintain continuous compliance through monitoring and improvement",
+        "timeline": "Ongoing",
+        "milestones": [
+            {
+                "id": "p6_m1",
+                "title": "Regular Compliance Reviews",
+                "description": "Conduct quarterly compliance reviews and assessments",
+                "required": True,
+                "estimated_hours": 16,
+            },
+            {
+                "id": "p6_m2",
+                "title": "Update Policies and Procedures",
+                "description": "Regularly review and update HIPAA policies based on regulatory changes",
+                "required": True,
+                "estimated_hours": 12,
+            },
+            {
+                "id": "p6_m3",
+                "title": "Continuous Security Testing",
+                "description": "Perform ongoing penetration testing and security assessments",
+                "required": True,
+                "estimated_hours": 32,
+            },
+            {
+                "id": "p6_m4",
+                "title": "Compliance Metrics Tracking",
+                "description": "Monitor and report on key compliance metrics and KPIs",
+                "required": False,
+                "estimated_hours": 8,
+            },
+        ],
+    },
+}
+
+
+class RoadmapMilestoneUpdate(BaseModel):
+    milestone_id: str
+    status: str  # 'pending', 'in_progress', 'completed', 'blocked'
+    notes: str = ""
+    completion_date: str = None
+
+
+@app.get("/api/v1/roadmap")
+async def get_compliance_roadmap(
+    current_user: dict = Depends(get_current_user_optional),
+):
+    """Get the complete compliance roadmap template"""
+    print("🗺️ [PROD] Fetching compliance roadmap template")
+
+    try:
+        # Get user's current progress
+        user_id = current_user["user_id"]
+        user_progress = {}
+
+        try:
+            # Try DynamoDB first for production
+            dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+            roadmap_table = dynamodb.Table(
+                os.environ.get("ROADMAP_TABLE", "themisguard-prod-roadmap")
+            )
+
+            # Get user's progress
+            response = roadmap_table.query(
+                KeyConditionExpression=Key("user_id").eq(user_id)
+            )
+
+            user_progress = {
+                item["milestone_id"]: item for item in response.get("Items", [])
+            }
+            print(f"🗺️ [PROD] Retrieved {len(user_progress)} milestones from DynamoDB")
+
+        except Exception as db_error:
+            print(
+                f"⚠️ [PROD] DynamoDB not available, using fallback storage: {db_error}"
+            )
+            # Use in-memory storage for development
+            user_progress = ROADMAP_PROGRESS.get(user_id, {})
+
+        # Merge template with user progress
+        roadmap_with_progress = {}
+
+        for phase_key, phase_data in COMPLIANCE_ROADMAP_TEMPLATE.items():
+            phase_copy = phase_data.copy()
+            milestones_with_progress = []
+
+            for milestone in phase_data["milestones"]:
+                milestone_copy = milestone.copy()
+                milestone_id = milestone["id"]
+
+                if milestone_id in user_progress:
+                    progress = user_progress[milestone_id]
+                    milestone_copy.update(
+                        {
+                            "status": progress.get("status", "pending"),
+                            "notes": progress.get("notes", ""),
+                            "completion_date": progress.get("completion_date"),
+                            "started_date": progress.get("started_date"),
+                            "updated_at": progress.get("updated_at"),
+                        }
+                    )
+                else:
+                    milestone_copy["status"] = "pending"
+
+                milestones_with_progress.append(milestone_copy)
+
+            phase_copy["milestones"] = milestones_with_progress
+            roadmap_with_progress[phase_key] = phase_copy
+
+        # Calculate overall progress
+        total_milestones = sum(
+            len(phase["milestones"]) for phase in COMPLIANCE_ROADMAP_TEMPLATE.values()
+        )
+        completed_milestones = len(
+            [
+                item
+                for item in user_progress.values()
+                if item.get("status") == "completed"
+            ]
+        )
+        progress_percentage = (
+            (completed_milestones / total_milestones * 100)
+            if total_milestones > 0
+            else 0
+        )
+
+        # Determine compliance maturity level
+        if progress_percentage >= 90:
+            maturity_level = "advanced"
+        elif progress_percentage >= 70:
+            maturity_level = "intermediate"
+        elif progress_percentage >= 40:
+            maturity_level = "developing"
+        elif progress_percentage >= 20:
+            maturity_level = "basic"
+        else:
+            maturity_level = "initial"
+
+        return {
+            "roadmap": roadmap_with_progress,
+            "user_progress": {
+                "total_milestones": total_milestones,
+                "completed_milestones": completed_milestones,
+                "progress_percentage": round(progress_percentage, 1),
+                "maturity_level": maturity_level,
+            },
+        }
+
+    except Exception as e:
+        print(f"❌ [PROD] Roadmap retrieval failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Roadmap retrieval failed: {str(e)}"
+        )
+
+
+@app.put("/api/v1/roadmap/milestone")
+async def update_milestone_progress(
+    update: RoadmapMilestoneUpdate,
+    current_user: dict = Depends(get_current_user_optional),
+):
+    """Update progress on a specific milestone"""
+    print(f"📋 [PROD] Updating milestone progress: {update.milestone_id}")
+
+    try:
+        user_id = current_user["user_id"]
+        current_time = datetime.utcnow().isoformat() + "Z"
+
+        # Prepare item data
+        item_data = {
+            "user_id": user_id,
+            "milestone_id": update.milestone_id,
+            "status": update.status,
+            "notes": update.notes,
+            "updated_at": current_time,
+            "phase": update.milestone_id.split("_")[
+                0
+            ],  # Extract phase from milestone ID
+        }
+
+        # Add completion date if status is completed
+        if update.status == "completed" and update.completion_date:
+            item_data["completion_date"] = update.completion_date
+        elif update.status == "completed":
+            item_data["completion_date"] = current_time
+
+        # Add started date if status is in_progress
+        if update.status == "in_progress":
+            # Check existing data first
+            if user_id not in ROADMAP_PROGRESS:
+                ROADMAP_PROGRESS[user_id] = {}
+
+            existing_milestone = ROADMAP_PROGRESS[user_id].get(update.milestone_id, {})
+            if "started_date" not in existing_milestone:
+                item_data["started_date"] = current_time
+            else:
+                item_data["started_date"] = existing_milestone["started_date"]
+
+        try:
+            # Try DynamoDB first for production
+            dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+            roadmap_table = dynamodb.Table(
+                os.environ.get("ROADMAP_TABLE", "themisguard-prod-roadmap")
+            )
+
+            # Check existing record for started_date preservation
+            if update.status == "in_progress":
+                try:
+                    existing = roadmap_table.get_item(
+                        Key={"user_id": user_id, "milestone_id": update.milestone_id}
+                    )
+                    if "Item" in existing and "started_date" in existing["Item"]:
+                        item_data["started_date"] = existing["Item"]["started_date"]
+                except Exception:
+                    pass  # Use current_time as fallback
+
+            # Store in DynamoDB
+            roadmap_table.put_item(Item=item_data)
+            print(f"✅ [PROD] Milestone stored in DynamoDB: {update.milestone_id}")
+
+        except Exception as db_error:
+            print(
+                f"⚠️ [PROD] DynamoDB not available, using fallback storage: {db_error}"
+            )
+            # Use in-memory storage for development
+            if user_id not in ROADMAP_PROGRESS:
+                ROADMAP_PROGRESS[user_id] = {}
+            ROADMAP_PROGRESS[user_id][update.milestone_id] = item_data
+            print(
+                f"✅ [PROD] Milestone stored in fallback storage: {update.milestone_id}"
+            )
+
+        print(f"✅ [PROD] Milestone {update.milestone_id} updated to {update.status}")
+
+        return {
+            "success": True,
+            "milestone_id": update.milestone_id,
+            "status": update.status,
+            "updated_at": current_time,
+        }
+
+    except Exception as e:
+        print(f"❌ [PROD] Milestone update failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Milestone update failed: {str(e)}"
+        )
+
+
+@app.get("/api/v1/roadmap/progress")
+async def get_progress_summary(current_user: dict = Depends(get_current_user_optional)):
+    """Get high-level progress summary and analytics"""
+    print("📊 [PROD] Fetching roadmap progress summary")
+
+    try:
+        user_id = current_user["user_id"]
+        user_progress = []
+
+        try:
+            # Try DynamoDB first for production
+            dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+            roadmap_table = dynamodb.Table(
+                os.environ.get("ROADMAP_TABLE", "themisguard-prod-roadmap")
+            )
+
+            # Get all user progress
+            response = roadmap_table.query(
+                KeyConditionExpression=Key("user_id").eq(user_id)
+            )
+
+            user_progress = response.get("Items", [])
+            print(
+                f"📊 [PROD] Retrieved {len(user_progress)} progress items from DynamoDB"
+            )
+
+        except Exception as db_error:
+            print(
+                f"⚠️ [PROD] DynamoDB not available, using fallback storage: {db_error}"
+            )
+            # Use in-memory storage for development
+            user_milestone_data = ROADMAP_PROGRESS.get(user_id, {})
+            user_progress = list(user_milestone_data.values())
+
+        # Calculate phase-wise progress
+        phase_progress = {}
+        for phase_key, phase_data in COMPLIANCE_ROADMAP_TEMPLATE.items():
+            phase_milestones = [m["id"] for m in phase_data["milestones"]]
+            completed_in_phase = [
+                item
+                for item in user_progress
+                if item["milestone_id"] in phase_milestones
+                and item.get("status") == "completed"
+            ]
+
+            phase_progress[phase_key] = {
+                "name": phase_data["name"],
+                "total_milestones": len(phase_milestones),
+                "completed_milestones": len(completed_in_phase),
+                "progress_percentage": (
+                    len(completed_in_phase) / len(phase_milestones) * 100
+                )
+                if phase_milestones
+                else 0,
+            }
+
+        # Calculate overall metrics
+        total_milestones = sum(
+            len(phase["milestones"]) for phase in COMPLIANCE_ROADMAP_TEMPLATE.values()
+        )
+        completed_milestones = len(
+            [item for item in user_progress if item.get("status") == "completed"]
+        )
+        in_progress_milestones = len(
+            [item for item in user_progress if item.get("status") == "in_progress"]
+        )
+
+        # Estimate time to completion
+        remaining_milestones = total_milestones - completed_milestones
+        avg_hours_per_milestone = 32  # Average from milestone estimates
+        estimated_hours_remaining = remaining_milestones * avg_hours_per_milestone
+
+        progress_percentage = (
+            (completed_milestones / total_milestones * 100)
+            if total_milestones > 0
+            else 0
+        )
+
+        # Determine maturity level
+        if progress_percentage >= 90:
+            maturity_level = "advanced"
+            maturity_description = (
+                "Comprehensive HIPAA compliance implementation with ongoing monitoring"
+            )
+        elif progress_percentage >= 70:
+            maturity_level = "intermediate"
+            maturity_description = (
+                "Solid compliance foundation with most controls implemented"
+            )
+        elif progress_percentage >= 40:
+            maturity_level = "developing"
+            maturity_description = (
+                "Basic compliance structure in place, continued implementation needed"
+            )
+        elif progress_percentage >= 20:
+            maturity_level = "basic"
+            maturity_description = (
+                "Initial compliance efforts underway, significant work remaining"
+            )
+        else:
+            maturity_level = "initial"
+            maturity_description = (
+                "Beginning compliance journey, foundational work needed"
+            )
+
+        return {
+            "overall_progress": {
+                "total_milestones": total_milestones,
+                "completed_milestones": completed_milestones,
+                "in_progress_milestones": in_progress_milestones,
+                "progress_percentage": round(progress_percentage, 1),
+                "estimated_hours_remaining": estimated_hours_remaining,
+            },
+            "phase_progress": phase_progress,
+            "maturity_assessment": {
+                "level": maturity_level,
+                "description": maturity_description,
+                "next_phase": "phase_1" if maturity_level == "initial" else None,
+            },
+        }
+
+    except Exception as e:
+        print(f"❌ [PROD] Progress summary failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Progress summary failed: {str(e)}"
+        )
 
 
 # Lambda handler for AWS deployment
