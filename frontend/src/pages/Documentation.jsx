@@ -27,6 +27,8 @@ const Documentation = () => {
   const [sortBy, setSortBy] = useState('updated');
   const [userDocuments, setUserDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState(null);
 
   const fetchUserDocumentation = useCallback(async () => {
     try {
@@ -62,6 +64,29 @@ const Documentation = () => {
       console.error('Failed to generate documentation:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const migrateDocuments = async () => {
+    try {
+      setMigrating(true);
+      setMigrationStatus(null);
+      const response = await documentationAPI.migrateDocs();
+      setMigrationStatus({
+        type: 'success',
+        message: response.data.message,
+        migrated_count: response.data.migrated_count
+      });
+      // Refresh document list after migration
+      await fetchUserDocumentation();
+    } catch (error) {
+      console.error('Failed to migrate documentation:', error);
+      setMigrationStatus({
+        type: 'error',
+        message: 'Failed to migrate documentation templates'
+      });
+    } finally {
+      setMigrating(false);
     }
   };
 
@@ -171,6 +196,7 @@ const Documentation = () => {
                          (doc.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || 
                            doc.category === selectedCategory ||
+                           doc.template_type === selectedCategory ||
                            doc.document_type === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -191,11 +217,12 @@ const Documentation = () => {
   const getStatusBadge = (status) => {
     const badges = {
       published: { color: 'bg-green-100 text-green-800', text: 'Published' },
+      available: { color: 'bg-blue-100 text-blue-800', text: 'Available' },
       draft: { color: 'bg-yellow-100 text-yellow-800', text: 'Draft' },
       review: { color: 'bg-blue-100 text-blue-800', text: 'Under Review' },
       archived: { color: 'bg-gray-100 text-gray-800', text: 'Archived' }
     };
-    return badges[status] || badges.draft;
+    return badges[status] || badges.available;
   };
 
   const getSyncStatusIcon = (syncStatus) => {
@@ -235,14 +262,24 @@ const Documentation = () => {
         </div>
         <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
           {!isDemoMode && (
-            <button 
-              onClick={generateDocuments}
-              disabled={loading}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-            >
-              <DocumentArrowUpIcon className="h-4 w-4 mr-2" />
-              {loading ? 'Generating...' : 'Generate Compliance Docs'}
-            </button>
+            <>
+              <button 
+                onClick={migrateDocuments}
+                disabled={migrating || loading}
+                className="inline-flex items-center px-4 py-2 border border-blue-300 rounded-md shadow-sm text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50"
+              >
+                <ArrowPathIcon className={`h-4 w-4 mr-2 ${migrating ? 'animate-spin' : ''}`} />
+                {migrating ? 'Migrating...' : 'Migrate Templates'}
+              </button>
+              <button 
+                onClick={generateDocuments}
+                disabled={loading || migrating}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
+                <DocumentArrowUpIcon className="h-4 w-4 mr-2" />
+                {loading ? 'Generating...' : 'Generate Compliance Docs'}
+              </button>
+            </>
           )}
           {isDemoMode && (
             <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
@@ -256,6 +293,59 @@ const Documentation = () => {
           </button>
         </div>
       </div>
+
+      {/* Migration Status Alert */}
+      {migrationStatus && (
+        <div className={`rounded-md p-4 ${
+          migrationStatus.type === 'success' 
+            ? 'bg-green-50 border border-green-200' 
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          <div className="flex">
+            <div className="flex-shrink-0">
+              {migrationStatus.type === 'success' ? (
+                <CheckCircleIcon className="h-5 w-5 text-green-400" />
+              ) : (
+                <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+              )}
+            </div>
+            <div className="ml-3">
+              <h3 className={`text-sm font-medium ${
+                migrationStatus.type === 'success' ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {migrationStatus.type === 'success' ? 'Migration Complete' : 'Migration Failed'}
+              </h3>
+              <div className={`mt-2 text-sm ${
+                migrationStatus.type === 'success' ? 'text-green-700' : 'text-red-700'
+              }`}>
+                <p>{migrationStatus.message}</p>
+                {migrationStatus.migrated_count && (
+                  <p className="mt-1">
+                    Successfully migrated {migrationStatus.migrated_count} documentation templates.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="ml-auto pl-3">
+              <div className="-mx-1.5 -my-1.5">
+                <button
+                  onClick={() => setMigrationStatus(null)}
+                  className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                    migrationStatus.type === 'success' 
+                      ? 'text-green-500 hover:bg-green-100 focus:ring-green-600' 
+                      : 'text-red-500 hover:bg-red-100 focus:ring-red-600'
+                  }`}
+                >
+                  <span className="sr-only">Dismiss</span>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       {isDemoMode && (
@@ -414,9 +504,9 @@ const Documentation = () => {
             
             <div className="divide-y divide-gray-200">
               {sortedDocuments.map((doc) => {
-                const statusBadge = getStatusBadge(doc.status);
+                const statusBadge = getStatusBadge(doc.status || 'available');
                 return (
-                  <div key={doc.id} className="p-6 hover:bg-gray-50">
+                  <div key={doc.id || doc.document_id} className="p-6 hover:bg-gray-50">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-3 mb-2">
@@ -434,16 +524,23 @@ const Documentation = () => {
                         </p>
                         
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <span>Updated {formatDate(doc.lastModified)}</span>
-                          <span>by {doc.author}</span>
-                          <span>{doc.size}</span>
-                          <span className="text-blue-600 hover:text-blue-800">
-                            {doc.githubPath}
-                          </span>
+                          <span>Updated {formatDate(doc.lastModified || doc.updated_at)}</span>
+                          <span>by {doc.author || 'System'}</span>
+                          {doc.size && <span>{doc.size}</span>}
+                          {doc.file_path && (
+                            <span className="text-blue-600 hover:text-blue-800">
+                              {doc.file_path}
+                            </span>
+                          )}
+                          {doc.githubPath && (
+                            <span className="text-blue-600 hover:text-blue-800">
+                              {doc.githubPath}
+                            </span>
+                          )}
                         </div>
                         
                         <div className="flex flex-wrap gap-1 mt-3">
-                          {doc.tags.map((tag) => (
+                          {(doc.tags || []).map((tag) => (
                             <span
                               key={tag}
                               className="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-md"
@@ -451,6 +548,16 @@ const Documentation = () => {
                               {tag}
                             </span>
                           ))}
+                          {doc.template_type && (
+                            <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-md">
+                              {doc.template_type}
+                            </span>
+                          )}
+                          {doc.compliance_level && (
+                            <span className="inline-flex px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-md">
+                              {doc.compliance_level}
+                            </span>
+                          )}
                         </div>
                       </div>
                       

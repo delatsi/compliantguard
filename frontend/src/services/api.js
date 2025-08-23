@@ -95,6 +95,9 @@ export const documentationAPI = {
   
   // Generate compliance-specific documentation
   generateDocuments: () => api.post('/api/v1/documentation/generate', {}),
+  
+  // Migrate existing documentation templates to user-specific system
+  migrateDocs: () => api.post('/api/v1/documentation/migrate', {}),
 };
 
 // Compliance Roadmap API
