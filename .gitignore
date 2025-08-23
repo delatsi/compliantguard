@@ -65,8 +65,8 @@ logs/
 samconfig.toml.bak
 
 # Lambda deployment packages
-lambda_deployment.zip
-lambda_deployment_with_deps.zip
+lambda_deployment*.zip
+*.zip
 lambda_env.json
 
 # Python package dependencies for Lambda
