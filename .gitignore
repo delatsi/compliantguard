@@ -6,6 +6,7 @@ test-service-account.json
 *.key
 .env
 .env.local
+.env.staging
 .env.production
 
 # Python

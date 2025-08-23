@@ -6,6 +6,8 @@
     "dev": "./scripts/start-dev.sh",
     "start": "./scripts/start-dev.sh",
     "build": "cd frontend && npm run build",
+    "build:staging": "cd frontend && npm run build:staging",
+    "build:production": "cd frontend && npm run build:production",
     "preview": "cd frontend && npm run preview",
     "backend": "cd backend && source venv/bin/activate && python dev.py",
     "frontend": "cd frontend && npm run dev",
