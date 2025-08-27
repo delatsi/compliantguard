@@ -1388,6 +1388,11 @@ async def update_milestone_progress(
     """Update progress on a specific milestone"""
     print(f"📋 [PROD] Updating milestone progress: {update.milestone_id}")
 
+    # Validate milestone_id
+    if not update.milestone_id or update.milestone_id.strip() == "":
+        print(f"❌ [PROD] Invalid milestone ID: '{update.milestone_id}'")
+        raise HTTPException(status_code=400, detail="milestone_id cannot be empty")
+
     try:
         user_id = current_user["user_id"]
         current_time = datetime.utcnow().isoformat() + "Z"

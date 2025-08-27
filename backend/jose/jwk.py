@@ -2,7 +2,6 @@ from jose.backends.base import Key
 from jose.constants import ALGORITHMS
 from jose.exceptions import JWKError
 
-
 try:
     from jose.backends import RSAKey  # noqa: F401
 except ImportError:
