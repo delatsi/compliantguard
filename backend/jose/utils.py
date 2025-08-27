@@ -1,6 +1,7 @@
 import base64
 import struct
 
+
 # Piggyback of the backends implementation of the function that converts a long
 # to a bytes stream. Some plumbing is necessary to have the signatures match.
 try:

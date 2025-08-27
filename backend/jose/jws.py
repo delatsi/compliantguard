@@ -40,7 +40,9 @@ def sign(payload, key, headers=None, algorithm=ALGORITHMS.HS256):
 
     encoded_header = _encode_header(algorithm, additional_headers=headers)
     encoded_payload = _encode_payload(payload)
-    signed_output = _sign_header_and_claims(encoded_header, encoded_payload, algorithm, key)
+    signed_output = _sign_header_and_claims(
+        encoded_header, encoded_payload, algorithm, key
+    )
 
     return signed_output
 
@@ -215,7 +217,6 @@ def _sig_matches_keys(keys, signing_input, signature, alg):
 
 
 def _get_keys(key):
-
     if isinstance(key, Key):
         return (key,)
 
@@ -239,7 +240,9 @@ def _get_keys(key):
             return (key,)
 
     # Iterable but not text or mapping => list- or tuple-like
-    elif isinstance(key, Iterable) and not (isinstance(key, str) or isinstance(key, bytes)):
+    elif isinstance(key, Iterable) and not (
+        isinstance(key, str) or isinstance(key, bytes)
+    ):
         return key
 
     # Scalar value, wrap in tuple.
@@ -248,7 +251,6 @@ def _get_keys(key):
 
 
 def _verify_signature(signing_input, header, signature, key="", algorithms=None):
-
     alg = header.get("alg")
     if not alg:
         raise JWSError("No algorithm was specified in the JWS header.")

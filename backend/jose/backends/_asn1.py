@@ -2,8 +2,10 @@
 
 Required by rsa_backend but not cryptography_backend.
 """
+
 from pyasn1.codec.der import decoder, encoder
 from pyasn1.type import namedtype, univ
+
 
 RSA_ENCRYPTION_ASN1_OID = "1.2.840.113549.1.1.1"
 
@@ -12,7 +14,8 @@ class RsaAlgorithmIdentifier(univ.Sequence):
     """ASN1 structure for recording RSA PrivateKeyAlgorithm identifiers."""
 
     componentType = namedtype.NamedTypes(
-        namedtype.NamedType("rsaEncryption", univ.ObjectIdentifier()), namedtype.NamedType("parameters", univ.Null())
+        namedtype.NamedType("rsaEncryption", univ.ObjectIdentifier()),
+        namedtype.NamedType("parameters", univ.Null()),
     )
 
 
@@ -30,7 +33,8 @@ class PublicKeyInfo(univ.Sequence):
     """ASN1 structure for recording PKCS8 public keys."""
 
     componentType = namedtype.NamedTypes(
-        namedtype.NamedType("algorithm", RsaAlgorithmIdentifier()), namedtype.NamedType("publicKey", univ.BitString())
+        namedtype.NamedType("algorithm", RsaAlgorithmIdentifier()),
+        namedtype.NamedType("publicKey", univ.BitString()),
     )
 
 

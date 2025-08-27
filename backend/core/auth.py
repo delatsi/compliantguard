@@ -3,11 +3,12 @@ from typing import Any, Dict, Optional
 
 import boto3
 from botocore.exceptions import ClientError
-from core.config import settings
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
+from core.config import settings
 
 
 security = HTTPBearer()

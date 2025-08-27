@@ -37,8 +37,16 @@ const Roadmap = () => {
   };
 
   const handleMilestoneUpdate = async (milestoneId, newStatus, notes = '') => {
+    // Validate milestone ID
+    if (!milestoneId || milestoneId.trim() === '') {
+      console.error('Invalid milestone ID:', milestoneId);
+      alert('Error: Invalid milestone ID. Please refresh the page and try again.');
+      return;
+    }
+
     try {
       setUpdatingMilestone(milestoneId);
+      console.log('Updating milestone:', milestoneId, 'to status:', newStatus);
       await roadmapAPI.updateMilestone(milestoneId, newStatus, notes);
       
       // Refresh data

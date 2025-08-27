@@ -16,6 +16,7 @@ from jose.constants import ALGORITHMS
 from jose.exceptions import JWEError, JWKError
 from jose.utils import base64_to_long, long_to_base64
 
+
 ALGORITHMS.SUPPORTED.remove(ALGORITHMS.RSA_OAEP)  # RSA OAEP not supported
 
 LEGACY_INVALID_PKCS8_RSA_HEADER = binascii.unhexlify(
@@ -166,7 +167,9 @@ class RSAKey(Key):
                                 # encoding then pyasn1 will throw an error attempting
                                 # to parse the key.
                                 pkcs1_key = _legacy_private_key_pkcs8_to_pkcs1(der)
-                            self._prepared_key = pyrsa.PrivateKey.load_pkcs1(pkcs1_key, format="DER")
+                            self._prepared_key = pyrsa.PrivateKey.load_pkcs1(
+                                pkcs1_key, format="DER"
+                            )
                         except ValueError as e:
                             raise JWKError(e)
             return
@@ -174,7 +177,10 @@ class RSAKey(Key):
 
     def _process_jwk(self, jwk_dict):
         if not jwk_dict.get("kty") == "RSA":
-            raise JWKError("Incorrect key type. Expected: 'RSA', Received: %s" % jwk_dict.get("kty"))
+            raise JWKError(
+                "Incorrect key type. Expected: 'RSA', Received: %s"
+                % jwk_dict.get("kty")
+            )
 
         e = base64_to_long(jwk_dict.get("e"))
         n = base64_to_long(jwk_dict.get("n"))
@@ -205,7 +211,10 @@ class RSAKey(Key):
 
     def verify(self, msg, sig):
         if not self.is_public():
-            warnings.warn("Attempting to verify a message with a private key. " "This is not recommended.")
+            warnings.warn(
+                "Attempting to verify a message with a private key. "
+                "This is not recommended."
+            )
         try:
             pyrsa.verify(msg, sig, self._prepared_key)
             return True
@@ -218,10 +227,12 @@ class RSAKey(Key):
     def public_key(self):
         if isinstance(self._prepared_key, pyrsa.PublicKey):
             return self
-        return self.__class__(pyrsa.PublicKey(n=self._prepared_key.n, e=self._prepared_key.e), self._algorithm)
+        return self.__class__(
+            pyrsa.PublicKey(n=self._prepared_key.n, e=self._prepared_key.e),
+            self._algorithm,
+        )
 
     def to_pem(self, pem_format="PKCS8"):
-
         if isinstance(self._prepared_key, pyrsa.PrivateKey):
             der = self._prepared_key.save_pkcs1(format="DER")
             if pem_format == "PKCS8":
@@ -272,7 +283,10 @@ class RSAKey(Key):
 
     def wrap_key(self, key_data):
         if not self.is_public():
-            warnings.warn("Attempting to encrypt a message with a private key." " This is not recommended.")
+            warnings.warn(
+                "Attempting to encrypt a message with a private key."
+                " This is not recommended."
+            )
         wrapped_key = pyrsa.encrypt(key_data, self._prepared_key)
         return wrapped_key
 
