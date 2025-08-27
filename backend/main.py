@@ -58,10 +58,14 @@ async def get_current_user(
     """Extract user information from JWT token"""
     try:
         token = credentials.credentials
+        print(f"🔍 [PROD] Verifying JWT token: {token[:20]}...")
+
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+        print(f"✅ [PROD] JWT payload decoded successfully: {payload}")
 
         user_id = payload.get("user_id")
         if not user_id:
+            print("❌ [PROD] No user_id in JWT payload")
             raise HTTPException(status_code=401, detail="Invalid token")
 
         # For development, create a user object from token
@@ -72,8 +76,10 @@ async def get_current_user(
             "last_name": payload.get("last_name", "Name"),
         }
 
+        print(f"👤 [PROD] JWT verification successful for user: {user_id}")
         return user
-    except JWTError:
+    except JWTError as e:
+        print(f"❌ [PROD] JWT verification failed: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
@@ -243,7 +249,8 @@ async def login(request: AuthRequest):
         # Create JWT token
         token_payload = {
             **user_data,
-            "exp": datetime.utcnow().timestamp() + 86400,  # 24 hours
+            "exp": int(datetime.utcnow().timestamp()) + 86400,  # 24 hours
+            "iat": int(datetime.utcnow().timestamp()),  # Issued at
         }
 
         access_token = jwt.encode(
