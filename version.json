@@ -1,6 +1,6 @@
 {
-  "app_version": "1.2.4",
-  "api_version": "1.2.1",
-  "build_date": "2025-08-15-0819",
-  "release_notes": "Initial Themis Deployment"
+  "app_version": "1.4.2",
+  "api_version": "1.4.2",
+  "build_date": "2025-01-27",
+  "release_notes": "Backend cleanup for proper GitHub Actions deployment, milestone validation fixes"
 }
