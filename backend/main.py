@@ -1265,7 +1265,7 @@ class RoadmapMilestoneUpdate(BaseModel):
     milestone_id: str
     status: str  # 'pending', 'in_progress', 'completed', 'blocked'
     notes: str = ""
-    completion_date: str = None
+    completion_date: Optional[str] = None
 
 
 @app.get("/api/v1/roadmap")
