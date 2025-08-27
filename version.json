@@ -1,6 +1,6 @@
 {
-  "app_version": "1.4.2",
-  "api_version": "1.4.2",
+  "app_version": "1.4.3",
+  "api_version": "1.4.3",
   "build_date": "2025-01-27",
-  "release_notes": "Backend cleanup for proper GitHub Actions deployment, milestone validation fixes"
+  "release_notes": "Fixed frontend API URL to use working staging backend, milestone update now functional"
 }
