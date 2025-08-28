@@ -11,7 +11,16 @@ from typing import Optional
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -1646,7 +1655,7 @@ async def create_stripe_customer(
     try:
         # Mock customer creation for demo
         customer_id = f"cus_demo_{current_user['user_id']}"
-        
+
         print(f"💳 [PROD] Demo customer created: {customer_id}")
 
         return {
@@ -1667,13 +1676,13 @@ async def create_subscription(
     print(f"💳 [PROD] Creating subscription for user: {current_user['user_id']}")
 
     try:
-        from models.subscription import PlanTier, BillingInterval
-        
+        from models.subscription import BillingInterval, PlanTier
+
         # Parse request
         plan_tier = PlanTier(request["plan_tier"])
         billing_interval = BillingInterval(request.get("billing_interval", "month"))
         trial_days = request.get("trial_days", 14)
-        
+
         # Mock subscription for demo
         subscription_data = {
             "subscription_id": f"sub_demo_{current_user['user_id']}",
@@ -1742,7 +1751,8 @@ async def create_billing_portal_session(
 
         stripe_service = StripeService()
         portal_url = await stripe_service.create_billing_portal_session(
-            current_user["user_id"], request.get("return_url", "https://compliantguard.datfunc.com/billing")
+            current_user["user_id"],
+            request.get("return_url", "https://compliantguard.datfunc.com/billing"),
         )
 
         return {
