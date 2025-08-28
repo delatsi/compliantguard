@@ -1,6 +1,23 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { authAPI } from '../services/api';
 
+// Helper function to check if JWT token is expired
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  
+  try {
+    // Decode JWT payload (second part of the token)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Math.floor(Date.now() / 1000);
+    
+    // Check if token has expired (with 30 second buffer for network delays)
+    return payload.exp && payload.exp < (currentTime + 30);
+  } catch (error) {
+    console.warn('Error decoding token:', error);
+    return true; // Treat invalid tokens as expired
+  }
+};
+
 const AuthContext = createContext();
 
 const authReducer = (state, action) => {
@@ -31,6 +48,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
+      // Check if token is expired before verifying
+      if (isTokenExpired(token)) {
+        console.log('Token expired, removing from storage');
+        localStorage.removeItem('token');
+        dispatch({ type: 'LOGOUT' });
+        return;
+      }
+      
       // Verify token on app load
       verifyToken(token);
     }
@@ -112,7 +137,29 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     dispatch({ type: 'LOGOUT' });
+    // Redirect to home page after logout
+    if (window.location.pathname.startsWith('/app')) {
+      window.location.href = '/';
+    }
   };
+
+  // Periodically check for token expiration
+  useEffect(() => {
+    if (!state.token) return;
+
+    const checkTokenExpiration = () => {
+      const token = localStorage.getItem('token');
+      if (token && isTokenExpired(token)) {
+        console.log('Token expired during session, logging out');
+        logout();
+      }
+    };
+
+    // Check every 5 minutes
+    const interval = setInterval(checkTokenExpiration, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [state.token]);
 
   const value = {
     ...state,

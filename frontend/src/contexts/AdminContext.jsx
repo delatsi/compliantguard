@@ -17,6 +17,15 @@ export const AdminProvider = ({ children }) => {
   const [is2FAVerified, setIs2FAVerified] = useState(false);
   const [adminToken, setAdminToken] = useState(null);
 
+  const logoutAdmin = useCallback(() => {
+    setIsAdmin(false);
+    setAdminUser(null);
+    setIs2FAVerified(false);
+    setAdminToken(null);
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_2fa_verified');
+  }, []);
+
   const validateAdminSession = useCallback(async (token) => {
     try {
       // In real implementation, this would validate with backend
@@ -44,7 +53,7 @@ export const AdminProvider = ({ children }) => {
       console.error('Admin session validation failed');
       logoutAdmin();
     }
-  }, []);
+  }, [logoutAdmin]);
 
   // Check admin session on component mount
   useEffect(() => {
@@ -128,14 +137,6 @@ export const AdminProvider = ({ children }) => {
     }
   };
 
-  const logoutAdmin = () => {
-    setIsAdmin(false);
-    setAdminUser(null);
-    setIs2FAVerified(false);
-    setAdminToken(null);
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_2fa_verified');
-  };
 
   const hasPermission = (permission) => {
     return adminUser?.permissions?.includes(permission) || false;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { useVersion } from '../hooks/useVersion';
 import { 
   ShieldCheckIcon, 
@@ -11,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Landing = () => {
+  const { user, logout } = useAuth();
   const { version, loading } = useVersion();
   const features = [
     {
@@ -64,19 +66,45 @@ const Landing = () => {
               >
                 Pricing
               </Link>
-              <Link
-                to="/login"
-                className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/register"
-                className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium"
-                onClick={() => console.log('Header register link clicked')}
-              >
-                Get Started
-              </Link>
+              {user ? (
+                // Authenticated user menu
+                <>
+                  <Link
+                    to="/app"
+                    className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
+                  >
+                    Dashboard
+                  </Link>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-sm text-gray-600">
+                      Hello, {user.first_name || user.email}
+                    </span>
+                    <button
+                      onClick={logout}
+                      className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </>
+              ) : (
+                // Unauthenticated user menu
+                <>
+                  <Link
+                    to="/login"
+                    className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium"
+                    onClick={() => console.log('Header register link clicked')}
+                  >
+                    Get Started
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
