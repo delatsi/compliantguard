@@ -237,6 +237,48 @@ async def health_check():
     return health_details
 
 
+@app.get("/deployment-info")
+async def get_deployment_info():
+    """Get deployment information including git hash, build timestamp, and environment details"""
+    print("🚀 [PROD] Deployment info endpoint accessed")
+
+    # Try to read deployment info file
+    deployment_info = {
+        "environment": settings.ENVIRONMENT,
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.3.0",
+        "status": "deployment-info-available",
+    }
+
+    try:
+        # Try to read deployment-info.json from the same directory as main.py
+        import json
+
+        deployment_file_path = os.path.join(
+            os.path.dirname(__file__), "deployment-info.json"
+        )
+        if os.path.exists(deployment_file_path):
+            with open(deployment_file_path, "r") as f:
+                file_info = json.load(f)
+                deployment_info.update(file_info)
+                print(
+                    f"✅ [PROD] Loaded deployment info: {file_info.get('git', {}).get('shortHash', 'unknown')}"
+                )
+        else:
+            print(f"⚠️ [PROD] No deployment-info.json found at {deployment_file_path}")
+            deployment_info["status"] = "deployment-info-missing"
+            deployment_info["note"] = (
+                "Run ./scripts/generate-deployment-info.sh before deployment"
+            )
+
+    except Exception as e:
+        print(f"❌ [PROD] Error reading deployment info: {str(e)}")
+        deployment_info["status"] = "deployment-info-error"
+        deployment_info["error"] = str(e)
+
+    return deployment_info
+
+
 # Authentication endpoints
 @app.post("/api/v1/auth/login")
 async def login(request: AuthRequest):

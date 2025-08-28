@@ -1,0 +1,14 @@
+{
+  "environment": "local",
+  "timestamp": "2025-08-28T17:20:05Z",
+  "git": {
+    "hash": "0fd0fa5f9a2281618357f2e8f97bdb0fd4cb34f2",
+    "shortHash": "0fd0fa5",
+    "branch": "main",
+    "tag": ""
+  },
+  "build": {
+    "node_version": "v24.2.0",
+    "npm_version": "11.3.0"
+  }
+}
