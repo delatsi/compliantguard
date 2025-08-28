@@ -215,6 +215,148 @@ export const AdminProvider = ({ children }) => {
         averageResolutionTime: 4.2,
         customerSatisfactionScore: 4.6,
         escalatedTickets: 3
+      },
+
+      // Comprehensive churn analytics
+      churn_analytics: {
+        // Current churn metrics
+        monthly_churn_rate: 3.2,
+        quarterly_churn_rate: 9.1,
+        annual_churn_rate: 32.4,
+        gross_churn_rate: 3.8,
+        net_churn_rate: 1.9,  // Lower due to expansion revenue
+        // Churn trends over 6 months
+        churn_trend_6_months: [
+          {
+            month: "Jan",
+            churn_rate: 4.1,
+            churned_customers: 18,
+            expansion_revenue: 12400,
+          },
+          {
+            month: "Feb",
+            churn_rate: 3.8,
+            churned_customers: 16,
+            expansion_revenue: 15200,
+          },
+          {
+            month: "Mar",
+            churn_rate: 3.5,
+            churned_customers: 15,
+            expansion_revenue: 18900,
+          },
+          {
+            month: "Apr",
+            churn_rate: 3.2,
+            churned_customers: 14,
+            expansion_revenue: 21300,
+          },
+          {
+            month: "May",
+            churn_rate: 2.9,
+            churned_customers: 13,
+            expansion_revenue: 23800,
+          },
+          {
+            month: "Jun",
+            churn_rate: 3.2,
+            churned_customers: 15,
+            expansion_revenue: 25100,
+          },
+        ],
+        // Churn by customer segments
+        churn_by_plan: {
+          starter: 5.8,  // Higher churn for lower-tier plans
+          professional: 2.4,  // Mid-tier plans more stable
+          enterprise: 0.9,  // Enterprise customers very sticky
+        },
+        churn_by_industry: {
+          healthcare: 2.1,  // Lower churn in healthcare (compliance critical)
+          finance: 2.8,  // Moderate churn in finance
+          technology: 4.2,  // Higher churn in tech (more options)
+          other: 4.8,
+        },
+        churn_by_customer_age: {
+          "0-3_months": 15.2,  // High early churn
+          "3-6_months": 8.7,  // Onboarding complete, more stable
+          "6-12_months": 4.1,  // Getting value, lower churn
+          "12-24_months": 2.3,  // Established customers
+          "24+_months": 1.2,  // Long-term loyal customers
+        },
+        // Churn reasons and patterns
+        churn_reasons: [
+          { reason: "Price/Budget Constraints", percentage: 28.3, count: 17 },
+          { reason: "Lack of Product Adoption", percentage: 22.1, count: 13 },
+          { reason: "Competitive Solution", percentage: 18.5, count: 11 },
+          { reason: "Internal Tool Development", percentage: 12.4, count: 7 },
+          { reason: "Business Change/Closure", percentage: 8.9, count: 5 },
+          { reason: "Technical Issues", percentage: 6.2, count: 4 },
+          { reason: "Poor Support Experience", percentage: 3.6, count: 2 },
+        ],
+        voluntary_vs_involuntary: {
+          voluntary: 78.5,  // Customer chose to leave
+          involuntary: 21.5,  // Payment failures, etc.
+        },
+        // Early warning indicators
+        at_risk_customers: {
+          high_risk: 45,  // >70% churn probability
+          medium_risk: 123,  // 40-70% churn probability
+          low_risk: 234,  // 20-40% churn probability
+        },
+        engagement_decline_alerts: 28,  // Customers with declining usage
+        payment_failure_alerts: 12,  // Failed payment attempts
+        support_escalation_alerts: 8,  // Escalated support tickets
+        // Cohort retention analysis
+        cohort_retention_rates: [
+          {
+            cohort: "Jan_2023",
+            month_1: 95.2,
+            month_3: 87.1,
+            month_6: 78.9,
+            month_12: 68.2,
+          },
+          {
+            cohort: "Feb_2023",
+            month_1: 96.1,
+            month_3: 88.3,
+            month_6: 81.2,
+            month_12: 72.1,
+          },
+          {
+            cohort: "Mar_2023",
+            month_1: 94.8,
+            month_3: 86.9,
+            month_6: 79.4,
+            month_12: 70.8,
+          },
+          {
+            cohort: "Apr_2023",
+            month_1: 95.7,
+            month_3: 89.1,
+            month_6: 82.3,
+            month_12: 74.2,
+          },
+        ],
+        ltv_by_cohort: {
+          Q1_2023: 2847.50,
+          Q2_2023: 3124.80,
+          Q3_2023: 3356.20,
+          Q4_2023: 3598.90,
+        },
+        // Predictive analytics
+        predicted_churn_next_30_days: 23,
+        predicted_churn_next_90_days: 67,
+        churn_risk_score_distribution: {
+          "0-20": 832,  // Very low risk
+          "20-40": 234,  // Low risk
+          "40-60": 123,  // Medium risk
+          "60-80": 45,  // High risk
+          "80-100": 13,  // Very high risk
+        },
+        // Financial impact of churn
+        lost_revenue_this_month: 47800.00,
+        potential_lost_revenue_next_quarter: 142400.00,
+        saved_revenue_from_retention_efforts: 89300.00,
       }
     };
   };

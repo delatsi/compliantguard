@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     historyApiFallback: true,  // Enable SPA fallback for dev server
+    // Disable CSP in development to avoid issues
   },
   preview: {
     historyApiFallback: true,  // Enable SPA fallback for preview mode

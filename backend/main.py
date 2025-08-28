@@ -6,12 +6,12 @@ Production version with dev server functionality
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -1610,6 +1610,169 @@ async def get_progress_summary(current_user: dict = Depends(get_current_user_opt
         raise HTTPException(
             status_code=500, detail=f"Progress summary failed: {str(e)}"
         )
+
+
+# ================== STRIPE BILLING ENDPOINTS ==================
+
+
+@app.get("/api/v1/billing/plans")
+async def get_pricing_plans(current_user: dict = Depends(get_current_user_optional)):
+    """Get available pricing plans"""
+    print("💳 [PROD] Fetching pricing plans")
+
+    try:
+        # Import plans directly for demo
+        from models.subscription import THEMISGUARD_PLANS
+
+        plans = {tier.value: plan.dict() for tier, plan in THEMISGUARD_PLANS.items()}
+
+        return {
+            "plans": plans,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": "Pricing plans retrieved successfully",
+        }
+    except Exception as e:
+        print(f"❌ [PROD] Error fetching plans: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pricing plans")
+
+
+@app.post("/api/v1/billing/create-customer")
+async def create_stripe_customer(
+    request: dict, current_user: dict = Depends(get_current_user_optional)
+):
+    """Create a Stripe customer"""
+    print(f"💳 [PROD] Creating Stripe customer for user: {current_user['user_id']}")
+
+    try:
+        # Mock customer creation for demo
+        customer_id = f"cus_demo_{current_user['user_id']}"
+        
+        print(f"💳 [PROD] Demo customer created: {customer_id}")
+
+        return {
+            "customer_id": customer_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": "Demo customer created successfully",
+        }
+    except Exception as e:
+        print(f"❌ [PROD] Error creating customer: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create customer")
+
+
+@app.post("/api/v1/billing/create-subscription")
+async def create_subscription(
+    request: dict, current_user: dict = Depends(get_current_user_optional)
+):
+    """Create a subscription"""
+    print(f"💳 [PROD] Creating subscription for user: {current_user['user_id']}")
+
+    try:
+        from models.subscription import PlanTier, BillingInterval
+        
+        # Parse request
+        plan_tier = PlanTier(request["plan_tier"])
+        billing_interval = BillingInterval(request.get("billing_interval", "month"))
+        trial_days = request.get("trial_days", 14)
+        
+        # Mock subscription for demo
+        subscription_data = {
+            "subscription_id": f"sub_demo_{current_user['user_id']}",
+            "customer_id": request["customer_id"],
+            "plan_tier": plan_tier.value,
+            "billing_interval": billing_interval.value,
+            "status": "trialing",
+            "trial_end": (datetime.utcnow() + timedelta(days=trial_days)).isoformat(),
+            "current_period_start": datetime.utcnow().isoformat(),
+            "current_period_end": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+        }
+
+        print(f"💳 [PROD] Demo subscription created: {subscription_data}")
+
+        return {
+            "subscription": subscription_data,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": "Demo subscription created successfully",
+        }
+    except Exception as e:
+        print(f"❌ [PROD] Error creating subscription: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create subscription")
+
+
+@app.get("/api/v1/billing/subscription")
+async def get_user_subscription(
+    current_user: dict = Depends(get_current_user_optional),
+):
+    """Get user's current subscription"""
+    print(f"💳 [PROD] Fetching subscription for user: {current_user['user_id']}")
+
+    try:
+        from services.stripe_service import StripeService
+
+        stripe_service = StripeService()
+        subscription = await stripe_service.get_user_subscription(
+            current_user["user_id"]
+        )
+
+        if not subscription:
+            return {
+                "subscription": None,
+                "message": "No active subscription found",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+        return {
+            "subscription": subscription.dict(),
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": "Subscription retrieved successfully",
+        }
+    except Exception as e:
+        print(f"❌ [PROD] Error fetching subscription: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch subscription")
+
+
+@app.post("/api/v1/billing/create-portal-session")
+async def create_billing_portal_session(
+    request: dict, current_user: dict = Depends(get_current_user_optional)
+):
+    """Create a Stripe billing portal session"""
+    print(f"💳 [PROD] Creating billing portal for user: {current_user['user_id']}")
+
+    try:
+        from services.stripe_service import StripeService
+
+        stripe_service = StripeService()
+        portal_url = await stripe_service.create_billing_portal_session(
+            current_user["user_id"], request.get("return_url", "https://compliantguard.datfunc.com/billing")
+        )
+
+        return {
+            "portal_url": portal_url,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": "Billing portal session created",
+        }
+    except Exception as e:
+        print(f"❌ [PROD] Error creating portal session: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create portal session")
+
+
+@app.post("/api/v1/billing/webhook")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhooks"""
+    print("🔄 [PROD] Receiving Stripe webhook")
+
+    try:
+        from services.stripe_service import StripeService
+
+        payload = await request.body()
+        sig_header = request.headers.get("stripe-signature")
+
+        stripe_service = StripeService()
+        await stripe_service.handle_webhook_event(payload, sig_header)
+
+        return {"received": True}
+    except Exception as e:
+        print(f"❌ [PROD] Webhook error: {str(e)}")
+        raise HTTPException(status_code=400, detail="Webhook error")
 
 
 @app.post("/api/v1/documentation/migrate")

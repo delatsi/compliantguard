@@ -19,6 +19,7 @@ import ReportDetail from './pages/ReportDetail';
 import Settings from './pages/Settings';
 import Documentation from './pages/Documentation';
 import Roadmap from './pages/Roadmap';
+import Billing from './pages/Billing';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import SubscriptionManagement from './components/SubscriptionManagement';
@@ -59,6 +60,7 @@ function App() {
                   <Route path="reports/:scanId" element={<ReportDetail />} />
                   <Route path="documentation" element={<Documentation />} />
                   <Route path="roadmap" element={<Roadmap />} />
+                  <Route path="billing" element={<Billing />} />
                   <Route path="settings" element={<Settings />} />
                 </Route>
                 
@@ -77,6 +79,7 @@ function App() {
                   <Route path="reports/:scanId" element={<ReportDetail />} />
                   <Route path="documentation" element={<Documentation />} />
                   <Route path="roadmap" element={<Roadmap />} />
+                  <Route path="billing" element={<Billing />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="subscription" element={<SubscriptionManagement />} />
                 </Route>

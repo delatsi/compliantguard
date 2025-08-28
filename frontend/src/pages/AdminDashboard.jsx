@@ -15,28 +15,34 @@ import {
 } from '@heroicons/react/24/outline';
 
 const AdminDashboard = () => {
+  console.log('🔍 AdminDashboard: Component rendering...');
   const { adminUser, hasPermission, getAdminDashboardData, logoutAdmin } = useAdmin();
+  console.log('🔍 AdminDashboard: Admin user:', adminUser);
   const [dashboardData, setDashboardData] = useState(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState('30d');
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [selectedTimeRange, loadDashboardData]);
-
   const loadDashboardData = useCallback(async () => {
+    console.log('🔍 AdminDashboard: Starting to load dashboard data...');
     setRefreshing(true);
     try {
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('🔍 AdminDashboard: Calling getAdminDashboardData...');
       const data = getAdminDashboardData();
+      console.log('🔍 AdminDashboard: Received data:', data);
       setDashboardData(data);
+      console.log('✅ AdminDashboard: Data successfully set');
     } catch (error) {
-      console.error('Failed to load dashboard data:', error);
+      console.error('❌ Failed to load dashboard data:', error);
     } finally {
       setRefreshing(false);
     }
   }, [getAdminDashboardData]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [selectedTimeRange, loadDashboardData]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -54,15 +60,19 @@ const AdminDashboard = () => {
   };
 
   if (!dashboardData) {
+    console.log('🔍 AdminDashboard: Showing loading screen, dashboardData is:', dashboardData);
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading admin dashboard...</p>
+          <p className="mt-2 text-sm text-gray-500">Refreshing: {refreshing ? 'Yes' : 'No'}</p>
         </div>
       </div>
     );
   }
+
+  console.log('✅ AdminDashboard: Rendering full dashboard with data:', dashboardData);
 
   return (
     <div className="min-h-screen bg-gray-50">

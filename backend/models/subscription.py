@@ -130,6 +130,8 @@ THEMISGUARD_PLANS = {
         description="Perfect for small teams getting started with HIPAA compliance",
         price_monthly=49.00,
         price_annual=490.00,  # 2 months free
+        stripe_price_id_monthly="price_1QLKh6Pk8ZWm7QGtHPxCJ4h3",  # Test price ID
+        stripe_price_id_annual="price_1QLKh6Pk8ZWm7QGtHPxCJ4h4",   # Test price ID
         features=[
             "Up to 100 scans per month",
             "HIPAA compliance scanning",
@@ -153,6 +155,8 @@ THEMISGUARD_PLANS = {
         description="For growing companies with regular compliance needs",
         price_monthly=99.00,
         price_annual=990.00,  # 2 months free
+        stripe_price_id_monthly="price_1QLKh6Pk8ZWm7QGtHPxCJ4h5",  # Test price ID
+        stripe_price_id_annual="price_1QLKh6Pk8ZWm7QGtHPxCJ4h6",   # Test price ID
         features=[
             "Up to 500 scans per month",
             "HIPAA compliance scanning",
@@ -179,6 +183,8 @@ THEMISGUARD_PLANS = {
         description="For large organizations with comprehensive compliance requirements",
         price_monthly=199.00,
         price_annual=1990.00,  # 2 months free
+        stripe_price_id_monthly="price_1QLKh6Pk8ZWm7QGtHPxCJ4h7",  # Test price ID
+        stripe_price_id_annual="price_1QLKh6Pk8ZWm7QGtHPxCJ4h8",   # Test price ID
         features=[
             "Unlimited scans",
             "HIPAA compliance scanning",

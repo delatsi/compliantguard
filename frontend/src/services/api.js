@@ -118,4 +118,22 @@ export const roadmapAPI = {
   getProgressSummary: () => api.get('/api/v1/roadmap/progress'),
 };
 
+// Billing & Subscription API
+export const billingAPI = {
+  // Get available pricing plans
+  getPlans: () => api.get('/api/v1/billing/plans'),
+  
+  // Get user's current subscription
+  getSubscription: () => api.get('/api/v1/billing/subscription'),
+  
+  // Create a Stripe customer
+  createCustomer: (customerData) => api.post('/api/v1/billing/create-customer', customerData),
+  
+  // Create a subscription
+  createSubscription: (subscriptionData) => api.post('/api/v1/billing/create-subscription', subscriptionData),
+  
+  // Create billing portal session
+  createPortalSession: (data) => api.post('/api/v1/billing/create-portal-session', data),
+};
+
 export default api;
